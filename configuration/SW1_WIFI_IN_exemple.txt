@@ -1,0 +1,29 @@
+! EXEMPLE A ADAPTER ; VLAN 30 UNIQUEMENT
+! Les retours DNS/DHCP doivent etre permis sur VLAN 50.
+! Voir la matrice complete avant de deployer.
+configure terminal
+ip access-list extended WIFI_IN
+ 10 remark DHCP initial et renouvellement
+ 20 permit udp host 0.0.0.0 eq 68 host 255.255.255.255 eq 67
+ 30 permit udp 192.168.30.0 0.0.0.255 eq 68 host 255.255.255.255 eq 67
+ 40 permit udp 192.168.30.0 0.0.0.255 eq 68 host 192.168.50.20 eq 67
+ 50 remark DNS interne
+ 60 permit udp 192.168.30.0 0.0.0.255 host 192.168.50.20 eq 53
+ 70 permit tcp 192.168.30.0 0.0.0.255 host 192.168.50.20 eq 53
+ 80 remark Diagnostic passerelle et retours AP1 vers PC03
+ 90 permit icmp 192.168.30.0 0.0.0.255 host 192.168.30.254 echo
+ 100 permit tcp host 192.168.30.2 host 192.168.40.10 established
+ 110 permit icmp host 192.168.30.2 host 192.168.40.10 echo-reply
+ 120 remark Refus des autres destinations privees
+ 130 deny ip 192.168.30.0 0.0.0.255 10.0.0.0 0.255.255.255 log
+ 140 deny ip 192.168.30.0 0.0.0.255 172.16.0.0 0.15.255.255 log
+ 150 deny ip 192.168.30.0 0.0.0.255 192.168.0.0 0.0.255.255 log
+ 160 remark Web Internet
+ 170 permit tcp 192.168.30.0 0.0.0.255 any eq 80
+ 180 permit tcp 192.168.30.0 0.0.0.255 any eq 443
+ 999 deny ip any any log
+exit
+interface Vlan30
+ ip access-group WIFI_IN in
+exit
+end

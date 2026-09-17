@@ -1,0 +1,119 @@
+! EXEMPLE A ADAPTER AU MODELE ET AUX INTERFACES
+! Routage de base uniquement ; ajouter les ACL avant mise en service.
+! Aucun VLAN 99 actif. Sauvegarder apres recette.
+enable
+configure terminal
+hostname SW1
+no ip domain-lookup
+ip routing
+
+vlan 10
+ name DIRECTION
+exit
+interface range GigabitEthernet1/0/1 - 4
+ description ACCES-DIRECTION
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+exit
+interface Vlan10
+ ip address 192.168.10.254 255.255.255.0
+ no shutdown
+exit
+
+vlan 20
+ name COMPTABILITE
+exit
+interface range GigabitEthernet1/0/5 - 9
+ description ACCES-COMPTABILITE
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ no shutdown
+exit
+interface Vlan20
+ ip address 192.168.20.254 255.255.255.0
+ no shutdown
+exit
+
+vlan 30
+ name WIFI
+exit
+interface range GigabitEthernet1/0/10 - 14
+ description ACCES-WIFI
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+ no shutdown
+exit
+interface Vlan30
+ ip address 192.168.30.254 255.255.255.0
+ ip helper-address 192.168.50.20
+ no shutdown
+exit
+
+vlan 40
+ name ADMINISTRATION
+exit
+interface range GigabitEthernet1/0/15 - 18
+ description ACCES-ADMINISTRATION
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+ no shutdown
+exit
+interface Vlan40
+ ip address 192.168.40.254 255.255.255.0
+ no shutdown
+exit
+
+vlan 50
+ name SERVEURS
+exit
+interface range GigabitEthernet1/0/19 - 23
+ description ACCES-SERVEURS
+ switchport mode access
+ switchport access vlan 50
+ spanning-tree portfast
+ no shutdown
+exit
+interface Vlan50
+ ip address 192.168.50.254 255.255.255.0
+ no shutdown
+exit
+
+interface GigabitEthernet1/0/24
+ description TRANSIT-FW1-E0-2
+ no switchport
+ ip address 10.0.10.253 255.255.255.248
+ no shutdown
+exit
+
+ip route 0.0.0.0 0.0.0.0 10.0.10.254
+
+interface range GigabitEthernet1/0/2 - 4
+ description RESERVE-NON-RACCORDEE
+ shutdown
+exit
+
+interface range GigabitEthernet1/0/6 - 9
+ description RESERVE-NON-RACCORDEE
+ shutdown
+exit
+
+interface range GigabitEthernet1/0/11 - 14
+ description RESERVE-NON-RACCORDEE
+ shutdown
+exit
+
+interface range GigabitEthernet1/0/16 - 18
+ description RESERVE-NON-RACCORDEE
+ shutdown
+exit
+
+interface range GigabitEthernet1/0/19 - 22
+ description RESERVE-NON-RACCORDEE
+ shutdown
+exit
+end
