@@ -38,7 +38,7 @@ Les associations entre blocs d’alimentation et appareils doivent être relevé
 
 R1 port 3 rejoint directement FW1 e0/1 sur 10.0.0.248/29. FW1 e0/2 rejoint le port routé 24 de SW1 sur 10.0.10.248/29. FW1 e0/3 dessert la DMZ 10.0.20.0/24 et SRV1. SW1 conserve les passerelles des VLAN 10 à 50 ; son port 23 reste en accès VLAN 50 vers PC04.
 
-![Schéma réseau de référence](schema-reseau.png)
+![Schéma réseau de référence]("schéma réseau.pdf")
 
 Le schéma distingue l’hyperviseur SRV1 10.0.20.1 et les adresses de VM 10.0.20.2 à 10.0.20.252. L’adresse 10.0.20.254 est proposée pour FW1 e0/3, dont l’IP n’est pas indiquée sur le schéma. SW2 est conservé à l’inventaire mais n’est plus raccordé.
 
