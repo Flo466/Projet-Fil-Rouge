@@ -2,37 +2,39 @@
 
 Projet de préparation au titre professionnel Administrateur d’infrastructures sécurisées.
 
-La documentation décrit le réseau, son câblage, son adressage, les services, le routage et la politique de filtrage à mettre en place. Elle est alignée sur le dernier schéma du 17 septembre 2026, au commit `743c5c2`, intégré dans `main` par `8476785`.
+La documentation décrit le réseau, son câblage, son adressage, ses services, son routage et sa politique de filtrage. Elle est alignée sur le schéma `docs/schéma réseau.pdf` de la branche `yanis`, au commit `2276171` du 18 septembre 2026.
 
 ## Documents
 
 | Document | Contenu |
 | --- | --- |
-| [Schéma réseau de référence](TPAIS%20projet%20diagramme.pdf) | Topologie fournie, conservée dans sa version originale |
-| [Dossier technique Word](Dossier_reseau.docx) | Inventaire, réseaux, hôtes, VM, câblage, routage, filtrage, mise en service et recette |
-| [Dossier technique en Markdown](docs/Dossier_reseau.md) | Version textuelle du dossier pour la lecture et la revue des modifications dans Git |
-| [Guide de configuration PDF](Configuration_Reseau_Commandes.pdf) | Paramètres par équipement, exemples IOS et PowerShell, procédures de vérification et retour arrière |
-| [Guide de configuration en Markdown](docs/Configuration_Reseau_Commandes.md) | Version textuelle du guide avec les commandes copiables |
-| [Exemple de base SW1](configuration/SW1_base_IOS_exemple.txt) | VLAN, ports, SVI, relais DHCP et routage IOS ; ACL à ajouter avant mise en service |
-| [Exemple ACL Wi-Fi](configuration/SW1_WIFI_IN_exemple.txt) | Filtre IPv4 entrant du VLAN 30 ; dépend aussi des autorisations de retour sur VLAN 50 |
+| [Schéma réseau de référence](docs/sch%C3%A9ma%20r%C3%A9seau.pdf) | Topologie et adressage de référence |
+| [Dossier technique](docs/Dossier_reseau.md) | Inventaire, réseaux, hôtes, VM, câblage, routage, filtrage, mise en service et recette |
+| [Guide de configuration](docs/Configuration_Reseau_Commandes.md) | Paramètres par équipement, exemples IOS et PowerShell, procédures de vérification et retour arrière |
+| [Inventaire des configurations](configuration/README.md) | Liste des configurations à préparer, appliquer, vérifier et sauvegarder |
+| [Exemple de base SW1](configuration/SW1_base_IOS_exemple.txt) | VLAN, ports, SVI, relais DHCP et routage IOS ; ACL à compléter avant mise en service |
+| [Exemple ACL Wi-Fi](configuration/SW1_WIFI_IN_exemple.txt) | Filtre IPv4 entrant du VLAN 30 ; dépend aussi des autorisations de retour sur le VLAN 50 |
 
 ## Architecture actualisée
 
 ```text
-R1 port 3 (10.0.0.254/29)
+Internet / réseau NAT 172.16.50.0/24
   |
-  | Transit 10.0.0.248/29
+R1 port 1 (adresse et passerelle amont à relever)
+  |
+R1 port 4 (10.0.0.254/29)
   |
 FW1 e0/1 (10.0.0.253/29) - zone AMONT
   |
   +-- e0/3 (10.0.20.254/24 proposée) - zone DMZ
   |      +-- SRV1 Proxmox (10.0.20.1/24)
-  |             +-- WEB01 (10.0.20.10/24 proposée)
-  |             +-- DNSDMZ01 (10.0.20.53/24 proposée)
+  |             +-- DNS Windows       10.0.20.2/24
+  |             +-- Reverse proxy     10.0.20.3/24
+  |             +-- Web1              10.0.20.4/24
+  |             +-- Web2              10.0.20.5/24
+  |             +-- Web3              10.0.20.6/24
   |
   +-- e0/2 (10.0.10.254/29) - zone LAN
-         |
-         | Transit 10.0.10.248/29
          |
        SW1 port 24 (10.0.10.253/29)
          +-- VLAN 10 Direction       192.168.10.0/24
@@ -41,44 +43,41 @@ FW1 e0/1 (10.0.0.253/29) - zone AMONT
          +-- VLAN 40 Administration  192.168.40.0/24
          +-- VLAN 50 Serveurs        192.168.50.0/24
                 +-- PC04 Proxmox     192.168.50.10/24
-                       +-- DC01      192.168.50.20/24 proposée
-                       +-- GLPI01    192.168.50.30/24 proposée
+                       +-- Windows AD/DNS/DHCP/GLPI  192.168.50.11/24
+                       +-- Base Debian              192.168.50.12/24
+                       +-- Zabbix                    192.168.50.13/24
+                       +-- Squid                     192.168.50.14/24
 ```
 
-Les passerelles des VLAN 10 à 50 sont les adresses `.254` de SW1. SW2 est conservé en réserve et n’intervient plus dans les communications. Le câblage actif utilise huit des neuf câbles disponibles ; C02 reste libre. Le port 3 de R1 remplace l’ancien raccordement du port 4 vers SW2.
+Les passerelles des VLAN 10 à 50 sont les adresses `.254` de SW1. SW1 route les échanges inter-VLAN et les filtre par ACL. FW1 contrôle les communications entre LAN, DMZ et amont. Les échanges entre VM d’un même pont Proxmox ne traversent ni SW1 ni FW1 et doivent donc être filtrés sur les hôtes ou dans Proxmox.
 
-SW1 route les échanges entre VLAN et doit les filtrer par ACL. FW1 contrôle les communications entre LAN, DMZ et amont. Les échanges à l’intérieur d’un même VLAN nécessitent les pare-feu des hôtes, de Proxmox ou l’isolation Wi-Fi.
+Le schéma fixe aussi les interfaces de gestion R1 port 5 `192.168.0.1/24`, FW1 e0/0 `192.168.1.1/24` et l’adresse de gestion SW1 `192.168.99.10/24`. Aucun raccordement permanent n’est représenté pour ces réseaux. Le VLAN 99 reste réservé et les accès R1/FW1 s’effectuent localement, de façon temporaire, tant qu’un réseau de gestion dédié n’est pas conçu.
 
-## Compléments proposés
+## Changements issus du nouveau schéma
 
-Le schéma fixe les réseaux, les interfaces et les adresses des hyperviseurs. Les documents complètent les éléments suivants comme **propositions de mise en service**, sans les présenter comme une configuration déjà appliquée :
+- Le transit R1-FW1 utilise désormais le **port 4** de R1, et non le port 3.
+- Le **port 1 de R1** porte la sortie NAT vers le réseau amont `172.16.50.0/24`. L’adresse de R1, la passerelle et le mode d’attribution restent à relever.
+- Les VM internes sont fixées à `192.168.50.11` à `.14`. Le serveur Windows regroupe AD, DNS, DHCP et GLPI ; la base Debian, Zabbix et Squid deviennent des machines distinctes.
+- Les VM de DMZ sont fixées à `10.0.20.2` à `.6`. Le reverse proxy est séparé des trois serveurs Web.
+- Le relais DHCP, le DNS des clients, les ACL et les tests qui visaient `192.168.50.20` visent désormais `192.168.50.11`.
+- Une éventuelle publication Web doit cibler le reverse proxy `10.0.20.3`, jamais directement les serveurs Web `.4` à `.6`.
+- Le neuvième câble, auparavant en réserve, est affecté au WAN de R1. Les neuf câbles sont donc utilisés dans la topologie représentée.
 
-- `10.0.20.254/24` pour FW1 e0/3 et la passerelle de la DMZ ; `.253` reste libre.
-- DC01 `192.168.50.20` pour AD, DNS et DHCP ; GLPI01 `192.168.50.30` pour GLPI.
-- WEB01 `10.0.20.10` pour le Web et le reverse proxy ; DNSDMZ01 `10.0.20.53` pour la résolution externe à accès restreint.
-- DHCP Wi-Fi de `192.168.30.100` à `.199`, passerelle `192.168.30.254`, DNS `192.168.50.20`, bail proposé de huit heures.
-- Direction et Comptabilité autorisées vers AD, DNS, GLPI et le Web ; Wi-Fi isolé avec DNS, DHCP et Web vers Internet ; administration depuis PC03 `192.168.40.10`.
-- NAT Internet sur R1 si le modèle prend en charge les réseaux routés. Le guide décrit un repli avec SNAT sur FW1. Aucune publication WAN n’est activée par défaut.
+## Paramètres à confirmer
 
-L’adresse de gestion SW1 `192.168.99.10/24` est celle du nouveau schéma. Son transport n’étant pas défini, le VLAN 99 reste réservé et aucune joignabilité de cette IP n’est annoncée. L’administration de SW1 se fait provisoirement depuis PC03 via `192.168.40.254`.
+Le schéma ne précise pas l’adresse de FW1 e0/3 ; `10.0.20.254/24` reste la passerelle proposée pour la DMZ. Il ne donne pas non plus l’adresse exacte de R1 port 1, la passerelle amont, le domaine AD, les noms DNS, les certificats, les résolveurs et serveurs NTP externes, le port d’écoute de Squid ni le moteur et le port de la base Debian. Ces valeurs doivent être validées avant déploiement.
 
-Le dernier schéma ajoute les interfaces de gestion **R1 port 5 `192.168.0.1/24`** et **FW1 e0/0 `192.168.1.1/24`**. Le guide décrit un accès local successif depuis PC03, temporairement configuré en `192.168.0.10/24` puis `192.168.1.10/24`, sans passerelle. Ces deux IP de poste sont des propositions à vérifier. Aucun raccordement permanent ni route vers ces réseaux n’est ajouté au plan. Après intervention, PC03 retrouve son câblage et sa configuration du VLAN 40.
+Les exemples Cisco supposent une syntaxe IOS compatible. Les réglages TP-Link et Hillstone sont documentés sous forme de paramètres, sans inventer de commandes pour un modèle qui n’a pas encore été relevé. Les règles couvrent IPv4 ; IPv6 doit faire l’objet d’un plan d’adressage et de filtrage séparé s’il est activé.
 
 ## Ordre de mise en service
 
-1. Relever les modèles, versions, interfaces et capacités, puis sauvegarder les équipements.
-2. Recâbler R1, FW1 et SRV1 ; vérifier les deux transits et la DMZ.
-3. Configurer les VLAN, le routage, les hyperviseurs et les VM.
-4. Déployer DNS, AD, DHCP, GLPI et Web ; configurer le relais DHCP.
-5. Appliquer les matrices de filtrage et le NAT adapté au matériel.
-6. Effectuer les tests autorisés et interdits, conserver leurs preuves puis sauvegarder les configurations validées.
+1. Relever les modèles, versions, interfaces, paramètres WAN et capacités, puis sauvegarder les équipements.
+2. Recâbler le WAN, R1, FW1 et les deux hyperviseurs ; vérifier les deux transits et la DMZ.
+3. Configurer les VLAN, le routage, les ponts Proxmox et les adresses fixes des VM.
+4. Déployer AD, DNS, DHCP, GLPI, la base, Zabbix, Squid, le DNS de DMZ, le reverse proxy et les trois serveurs Web.
+5. Configurer le relais DHCP, les routes, le NAT et les matrices de filtrage.
+6. Exécuter les tests autorisés et interdits, conserver les preuves, puis sauvegarder les configurations validées.
 
 ## État de validation
 
-Les documents et les exemples décrivent une configuration cible. Les tests de recette restent à exécuter sur les équipements ; les résultats attendus ne sont pas des résultats observés.
-
-Les modèles exacts, les paramètres WAN, le domaine AD, les certificats, les résolveurs et NTP externes, ainsi que les associations d’alimentation doivent être relevés avant déploiement. Les exemples Cisco supposent une syntaxe IOS compatible. Les réglages TP-Link et Hillstone sont décrits sous forme de paramètres à saisir, sans leur attribuer une CLI non vérifiée.
-
-Les règles couvrent IPv4. Si IPv6 est utilisé, son adressage et son filtrage doivent être documentés séparément.
-
-Lors d’une prochaine modification, mettre à jour les versions Word ou PDF **et** leurs versions Markdown afin de conserver la cohérence des informations.
+Les documents et exemples décrivent une configuration cible. Ils n’attestent pas que les commandes ont été appliquées ni que les tests de recette ont réussi sur le matériel. Toute prochaine modification du schéma doit être répercutée dans les deux documents Markdown, l’inventaire des configurations et les exemples du dossier `configuration`.

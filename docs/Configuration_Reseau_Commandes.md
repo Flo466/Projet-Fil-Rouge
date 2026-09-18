@@ -1,8 +1,8 @@
 # Configuration réseau et vérifications
 
-Projet Fil Rouge - mise à jour du 17 septembre 2026
+Projet Fil Rouge - mise à jour du 18 septembre 2026
 
-Ce guide accompagne Dossier_reseau.docx et le schéma TPAIS projet diagramme.pdf. Il décrit la configuration cible, les exemples de commandes et la recette de la nouvelle architecture. Les paramètres proposés complètent le schéma ; aucune commande n’a été exécutée sur les équipements pour cette mise à jour documentaire.
+Ce guide accompagne `Dossier_reseau.md` et le schéma `schéma réseau.pdf` de la branche `yanis`, commit `2276171`. Il décrit la configuration cible, les exemples de commandes et la recette de la nouvelle architecture. Les paramètres proposés complètent le schéma ; aucune commande n’a été exécutée sur les équipements pour cette mise à jour documentaire.
 
 ## 1 Préparer la mise en service
 
@@ -10,7 +10,7 @@ Sauvegarder R1, FW1, SW1 et les hyperviseurs. Garder un accès console pendant l
 
 Les commandes SW1 sont des exemples IOS avec GigabitEthernet1/0/1 à 24. Adapter les noms après inventaire ; elles ne constituent pas une configuration constructeur validée pour un modèle inconnu. Pour le TP-Link et le Hillstone, les tableaux donnent les paramètres exacts à saisir dans leur interface d’administration. Une syntaxe IOS ne doit pas être utilisée comme syntaxe TP-Link.
 
-Conventions proposées : FW1 e0/3 = 10.0.20.254/24 ; DC01 = 192.168.50.20 ; GLPI01 = 192.168.50.30 ; WEB01 = 10.0.20.10 ; DNSDMZ01 = 10.0.20.53. Le Wi-Fi utilise uniquement DNS, DHCP et Web vers Internet. Ces choix doivent être vérifiés avant déploiement. Le VLAN 99 est réservé avec SW1 192.168.99.10 ; aucune interface opérationnelle ni route vers ce VLAN n’est créée.
+Convention proposée : FW1 e0/3 = `10.0.20.254/24`, car le schéma ne donne pas l’adresse de cette interface. Les adresses des VM sont en revanche fixées par le schéma : serveurs internes `192.168.50.11` à `.14` et serveurs DMZ `10.0.20.2` à `.6`. Le Wi-Fi utilise uniquement DNS, DHCP et l’accès Internet prévu. Le VLAN 99 est réservé avec SW1 `192.168.99.10` ; aucune interface opérationnelle ni route vers ce VLAN n’est créée.
 
 ## 2 Réseaux et raccordements
 
@@ -21,6 +21,7 @@ Conventions proposées : FW1 e0/3 = 10.0.20.254/24 ; DC01 = 192.168.50.20 ; GLPI
 | VLAN 30 Wi-Fi | 192.168.30.0/24 | 192.168.30.254 | 10 à 14 |
 | VLAN 40 Administration | 192.168.40.0/24 | 192.168.40.254 | 15 à 18 |
 | VLAN 50 Serveurs | 192.168.50.0/24 | 192.168.50.254 | 19 à 23 |
+| Réseau amont / NAT Internet | 172.16.50.0/24 | R1 port 1 ; IP et passerelle à relever | Sans objet |
 | Transit R1 vers FW1 | 10.0.0.248/29 | R1 .254 ; FW1 .253 | Sans objet |
 | Transit SW1 vers FW1 | 10.0.10.248/29 | SW1 .253 ; FW1 .254 | 24 routé |
 | DMZ | 10.0.20.0/24 | FW1 10.0.20.254 proposée | Sans objet |
@@ -30,8 +31,8 @@ Conventions proposées : FW1 e0/3 = 10.0.20.254/24 ; DC01 = 192.168.50.20 ; GLPI
 
 | Câble | Extrémité A | Extrémité B | Usage |
 | --- | --- | --- | --- |
-| C01 | R1 TP-Link<br>Port 3 | FW1 Hillstone<br>e0/1 | Transit 10.0.0.248/29 |
-| C02 | Non raccordé | Réserve | Maintenance locale ou WAN si nécessaire |
+| C01 | R1 TP-Link<br>Port 4 | FW1 Hillstone<br>e0/1 | Transit 10.0.0.248/29 |
+| C02 | Réseau amont / accès Internet | R1 TP-Link<br>Port 1 | WAN/NAT 172.16.50.0/24 |
 | C03 | FW1 Hillstone<br>e0/2 | SW1 Cisco<br>Port 24 | Transit 10.0.10.248/29 |
 | C04 | FW1 Hillstone<br>e0/3 | SRV1 ProLiant<br>Carte Ethernet reliée | DMZ 10.0.20.0/24 |
 | C05 | SW1 Cisco<br>Port 1 | PC01 Dell<br>Interface Ethernet | Accès VLAN 10 |
@@ -40,7 +41,7 @@ Conventions proposées : FW1 e0/3 = 10.0.20.254/24 ; DC01 = 192.168.50.20 ; GLPI
 | C08 | SW1 Cisco<br>Port 10 | AP1 Netis<br>Port LAN | Accès VLAN 30 |
 | C09 | SW1 Cisco<br>Port 23 | PC04 Dell Proxmox<br>Carte Ethernet reliée | Accès VLAN 50 |
 
-Huit câbles sont utilisés ; C02 reste en réserve. SW2 demeure dans l’inventaire mais sort de la topologie active. Les deux transits /29 ont pour masque 255.255.255.248 : réseau .248, hôtes .249 à .254, diffusion .255. La DMZ utilise 255.255.255.0.
+Les neuf câbles sont utilisés ; C02 est affecté au WAN de R1. SW2 demeure dans l’inventaire mais sort de la topologie active. Les deux transits /29 ont pour masque 255.255.255.248 : réseau .248, hôtes .249 à .254, diffusion .255. La DMZ et le réseau amont utilisent 255.255.255.0.
 
 ## 3 Configurer SW1
 
@@ -107,7 +108,7 @@ interface range GigabitEthernet1/0/10 - 14
 exit
 interface Vlan30
  ip address 192.168.30.254 255.255.255.0
- ip helper-address 192.168.50.20
+ ip helper-address 192.168.50.11
  no shutdown
 exit
 
@@ -214,15 +215,15 @@ Créer les cinq routes internes via 10.0.10.253 et la route par défaut via 10.0
 | FW1 | 192.168.10.0/24 ; 192.168.20.0/24<br>192.168.30.0/24 ; 192.168.40.0/24<br>192.168.50.0/24 | 10.0.10.253 |
 | FW1 | 0.0.0.0/0 | 10.0.0.254 |
 
-Dans les objets d’adresses, créer les cinq réseaux LAN, PC03, DC01, GLPI01, SRV1, WEB01, DNSDMZ01, R1 et les groupes de résolveurs et NTP approuvés. Dans les objets de services, saisir les ports de la section 7. Appliquer les règles de sécurité dans l’ordre indiqué. Les noms des menus varient avec la version StoneOS ; le modèle et la version doivent être relevés avant de convertir ces paramètres en commandes CLI.
+Dans les objets d’adresses, créer les cinq réseaux LAN, PC03, les quatre VM internes `.11` à `.14`, SRV1, les cinq VM DMZ `.2` à `.6`, R1 et les groupes de résolveurs et NTP approuvés. Dans les objets de services, saisir les ports de la section 7. Appliquer les règles de sécurité dans l’ordre indiqué. Les noms des menus varient avec la version StoneOS ; le modèle et la version doivent être relevés avant de convertir ces paramètres en commandes CLI.
 
 Le dernier schéma ajoute e0/0 = 192.168.1.1/24 pour la gestion dédiée de FW1. Cette interface reste isolée des trois zones de données et ne doit pas servir au transit. Autoriser l’accès local depuis le poste temporaire 192.168.1.10 ; le rôle exact de l’interface de gestion dépend du modèle. L’accès complémentaire depuis PC03 192.168.40.10 sur e0/2 doit être activé séparément si retenu. Tester HTTPS ou SSH avant de désactiver un ancien mode d’administration. Les règles de transit LAN vers DMZ ne suffisent pas à protéger le pare-feu lui-même.
 
 ## 5 Configurer R1 et le NAT
 
-Sur le TP-Link, configurer le port 3 avec 10.0.0.254/29. Vérifier que le réseau /29 peut être affecté à ce port ou à son groupe LAN et qu’aucun autre port ou Wi-Fi non prévu ne permet de rejoindre le transit. La passerelle WAN est celle du réseau amont, distincte de FW1.
+Sur le TP-Link, configurer le port 4 avec `10.0.0.254/29`. Vérifier que le réseau /29 peut être affecté à ce port ou à son groupe LAN et qu’aucun autre port ou Wi-Fi non prévu ne permet de rejoindre le transit. Configurer le port 1 sur le réseau amont `172.16.50.0/24` ; son adresse, son mode d’attribution et sa passerelle ne sont pas indiqués sur le schéma et doivent être relevés.
 
-Le port 5 de R1 porte 192.168.0.1/24 pour la gestion locale selon le dernier schéma. Le maintenir distinct du port 3 et du WAN. La procédure de maintenance de la section 9 utilise une liaison directe ; aucune route vers 192.168.0.0/24 n’est diffusée dans le LAN.
+Le port 5 de R1 porte `192.168.0.1/24` pour la gestion locale. Le maintenir distinct des ports 4 et 1. La procédure de maintenance de la section 9 utilise une liaison directe ; aucune route vers `192.168.0.0/24` n’est diffusée dans le LAN.
 
 | Destination | Masque | Prochain saut |
 | --- | --- | --- |
@@ -234,9 +235,9 @@ Le port 5 de R1 porte 192.168.0.1/24 pour la gestion locale selon le dernier sch
 | 10.0.10.248 | 255.255.255.248 | 10.0.0.253 |
 | 10.0.20.0 | 255.255.255.0 | 10.0.0.253 |
 
-Mode de référence : R1 effectue le NAT de sortie vers le WAN pour les cinq VLAN et la DMZ ; FW1 laisse leurs adresses sources inchangées. Vérifier explicitement que le modèle TP-Link traduit les réseaux atteints par des routes statiques. Si cette fonction n’est pas disponible, le repli consiste à faire un SNAT sur FW1 en sortie e0/1 vers 10.0.0.253, puis le NAT WAN de R1. Appliquer le SNAT uniquement aux destinations Internet et conserver une exemption pour les accès d’administration à R1. Documenter le mode choisi ; le double NAT peut limiter certains usages.
+Mode de référence : R1 effectue sur le port 1 le NAT de sortie vers `172.16.50.0/24` pour les cinq VLAN et la DMZ ; FW1 laisse leurs adresses sources inchangées. Vérifier explicitement que le modèle TP-Link traduit les réseaux atteints par des routes statiques. Si cette fonction n’est pas disponible, le repli consiste à faire un SNAT sur FW1 en sortie e0/1 vers `10.0.0.253`, puis le NAT WAN de R1. Appliquer le SNAT uniquement aux destinations Internet et conserver une exemption pour les accès d’administration à R1. Documenter le mode choisi ; le double NAT peut limiter certains usages.
 
-Ne pas traduire les flux LAN vers DMZ. Ne pas activer d’administration WAN, d’UPnP ou de publication globale. Une publication Web future nécessite deux DNAT TCP 80/443 : WAN de R1 vers 10.0.0.253, puis FW1 vers 10.0.20.10, avec une règle AMONT vers DMZ correspondante. Cette publication reste inactive et dépend de l’adresse WAN et de l’absence de blocage amont, notamment CGNAT.
+Ne pas traduire les flux LAN vers DMZ. Ne pas activer d’administration WAN, d’UPnP ou de publication globale. Une publication Web future nécessite deux DNAT TCP 80/443 : port 1 de R1 vers `10.0.0.253`, puis FW1 vers le reverse proxy `10.0.20.3`, avec une règle AMONT vers DMZ correspondante. Ne jamais publier directement Web1-Web3. Cette publication reste inactive et dépend de l’adresse amont et de l’absence de blocage supplémentaire.
 
 ## 6 Configurer les hyperviseurs et services
 
@@ -249,12 +250,17 @@ Ne pas traduire les flux LAN vers DMZ. Ne pas activer d’administration WAN, d�
 | AP1 Netis | 192.168.30.2/24 | 192.168.30.254 | Point d’accès en mode pont |
 | SRV1 ProLiant Proxmox | 10.0.20.1/24 | 10.0.20.254 | Hyperviseur DMZ |
 
-| VM proposée | Hébergement et services | IP fixe et passerelle |
+| VM ou rôle du schéma | Hébergement et services | IP fixe et passerelle |
 | --- | --- | --- |
-| DC01 | PC04 ; AD DS, DNS interne et DHCP | 192.168.50.20/24 ; GW 192.168.50.254 |
-| GLPI01 | PC04 ; application GLPI et base locale | 192.168.50.30/24 ; GW 192.168.50.254 |
-| WEB01 | SRV1 ; Web et reverse proxy sur la même VM | 10.0.20.10/24 ; GW 10.0.20.254 |
-| DNSDMZ01 | SRV1 ; résolveur DNS de la DMZ et redirecteur de DC01 | 10.0.20.53/24 ; GW 10.0.20.254 |
+| Windows Server interne | PC04 ; AD DS, DNS interne, DHCP et GLPI | 192.168.50.11/24 ; GW 192.168.50.254 |
+| Base de données Debian | PC04 ; moteur de base à confirmer | 192.168.50.12/24 ; GW 192.168.50.254 |
+| Monitoring Zabbix | PC04 ; serveur de supervision | 192.168.50.13/24 ; GW 192.168.50.254 |
+| Proxy Squid | PC04 ; mode et port à confirmer | 192.168.50.14/24 ; GW 192.168.50.254 |
+| Windows Server DNS DMZ | SRV1 ; DNS de DMZ et redirecteur du DNS interne | 10.0.20.2/24 ; GW 10.0.20.254 |
+| Reverse proxy | SRV1 ; terminaison et distribution HTTP/HTTPS | 10.0.20.3/24 ; GW 10.0.20.254 |
+| Web1 | SRV1 ; serveur Web | 10.0.20.4/24 ; GW 10.0.20.254 |
+| Web2 | SRV1 ; serveur Web | 10.0.20.5/24 ; GW 10.0.20.254 |
+| Web3 | SRV1 ; serveur Web | 10.0.20.6/24 ; GW 10.0.20.254 |
 
 ### Ponts Proxmox
 
@@ -289,9 +295,9 @@ Le pare-feu de Proxmox ou des VM doit également protéger les échanges à l’
 
 ### DNS et services applicatifs
 
-DC01 porte AD DS, le DNS interne et DHCP. Définir le domaine AD lors de l’installation et créer les enregistrements des services internes dans ce DNS. PC01, PC02 et PC03 utilisent 192.168.50.20. DC01 redirige les noms externes vers 10.0.20.53 ; DNSDMZ01 utilise les résolveurs externes approuvés. Les hôtes DMZ utilisent DNSDMZ01, sans accès direct au DNS AD.
+Le serveur Windows interne `192.168.50.11` porte AD DS, le DNS interne, DHCP et GLPI. Définir le domaine AD lors de l’installation et créer les enregistrements des services internes dans ce DNS. PC01, PC02 et PC03 utilisent `192.168.50.11`. Le DNS interne redirige les noms externes vers `10.0.20.2` ; le DNS de DMZ utilise les résolveurs externes approuvés. Les autres hôtes DMZ utilisent `10.0.20.2`, sans accès direct au DNS AD.
 
-Limiter la récursion de DNSDMZ01 à DC01 et aux hôtes DMZ inventoriés. Héberger GLPI sur GLPI01, avec base de données locale et accès HTTPS. WEB01 regroupe le site et le reverse proxy ; si les rôles sont séparés plus tard, attribuer une nouvelle IP de VM et documenter le flux entre proxy et serveur Web. Configurer les certificats et les noms avant la recette applicative.
+Limiter la récursion du DNS `10.0.20.2` au serveur Windows interne et aux hôtes DMZ inventoriés. Configurer GLPI sur `192.168.50.11` et n’autoriser son accès à la base Debian `192.168.50.12` que sur le port du moteur retenu. Configurer Zabbix `192.168.50.13` et ses agents avec les seuls ports nécessaires. Décider si Squid `192.168.50.14` est explicite ou transparent, fixer son port et empêcher le contournement seulement si la politique impose le proxy. Le reverse proxy `10.0.20.3` distribue HTTP/HTTPS vers Web1 `.4`, Web2 `.5` et Web3 `.6`. Ces derniers flux restent locaux au pont DMZ et doivent être filtrés par Proxmox ou les pare-feu des VM. Configurer les certificats, noms et contrôles d’intégrité avant la recette applicative.
 
 ### DHCP du Wi-Fi
 
@@ -300,12 +306,12 @@ Limiter la récursion de DNSDMZ01 à DC01 et aux hôtes DMZ inventoriés. Héber
 | Réseau et plage | 192.168.30.0/24 ; 192.168.30.100 à 192.168.30.199 |
 | Masque et bail proposé | 255.255.255.0 ; 8 heures |
 | Option 003 Routeur | 192.168.30.254 |
-| Option 006 DNS | 192.168.50.20 |
-| Serveur | DC01 192.168.50.20 ; rôle DHCP autorisé dans AD |
-| Relais sur SW1 | SVI VLAN 30 ; ip helper-address 192.168.50.20 |
+| Option 006 DNS | 192.168.50.11 |
+| Serveur | Windows Server interne 192.168.50.11 ; rôle DHCP autorisé dans AD |
+| Relais sur SW1 | SVI VLAN 30 ; `ip helper-address 192.168.50.11` |
 | Adresses hors plage | AP1 192.168.30.2 et passerelle .254 ; pas de réservation nécessaire |
 
-Sur DC01, installer le rôle DHCP, l’autoriser dans Active Directory, créer puis activer l’étendue VLAN30. Le suffixe DNS éventuel dépend du domaine choisi. AP1 reste en IP fixe et son serveur DHCP doit être désactivé ; utiliser son port LAN et le mode pont.
+Sur le serveur Windows interne, installer le rôle DHCP, l’autoriser dans Active Directory, créer puis activer l’étendue VLAN30. Le suffixe DNS éventuel dépend du domaine choisi. AP1 reste en IP fixe et son serveur DHCP doit être désactivé ; utiliser son port LAN et le mode pont.
 
 Exemple PowerShell, à utiliser seulement après installation et autorisation du rôle, si l’étendue n’existe pas déjà :
 
@@ -315,13 +321,13 @@ Add-DhcpServerv4Scope -Name "VLAN30-WIFI" `
   -SubnetMask 255.255.255.0 -LeaseDuration 0.08:00:00 `
   -State Active
 Set-DhcpServerv4OptionValue -ScopeId 192.168.30.0 `
-  -Router 192.168.30.254 -DnsServer 192.168.50.20
+  -Router 192.168.30.254 -DnsServer 192.168.50.11
 Get-DhcpServerv4Scope
 Get-DhcpServerv4OptionValue -ScopeId 192.168.30.0
 Get-DhcpServerv4Lease -ScopeId 192.168.30.0
 ```
 
-L’ACL de VLAN 30 doit autoriser la demande DHCP initiale depuis 0.0.0.0:68 vers 255.255.255.255:67, les nouvelles diffusions du /24 et le renouvellement unicast vers DC01. L’ACL de VLAN 50 doit laisser revenir DC01 UDP 67 vers le relais 192.168.30.254 UDP 67 et vers les clients VLAN 30 UDP 68. Le relais sélectionne l’étendue grâce à son adresse 192.168.30.254.
+L’ACL de VLAN 30 doit autoriser la demande DHCP initiale depuis 0.0.0.0:68 vers 255.255.255.255:67, les nouvelles diffusions du /24 et le renouvellement unicast vers `192.168.50.11`. L’ACL de VLAN 50 doit laisser revenir le serveur Windows UDP 67 vers le relais `192.168.30.254` UDP 67 et vers les clients VLAN 30 UDP 68. Le relais sélectionne l’étendue grâce à son adresse `192.168.30.254`.
 
 ## 7 Appliquer le filtrage
 
@@ -330,11 +336,14 @@ La première règle correspondante est appliquée. Les autorisations précises p
 | Groupe | Protocoles et ports de destination |
 | --- | --- |
 | DNS | UDP et TCP 53 |
-| AD_CLIENT | TCP 88, 135, 389, 445, 464, 3268, 49152 à 65535 ; UDP 88, 123, 389, 464 ; DNS ; ICMP vers DC01 |
+| AD_CLIENT | TCP 88, 135, 389, 445, 464, 3268, 49152 à 65535 ; UDP 88, 123, 389, 464 ; DNS ; ICMP vers le serveur Windows interne |
 | WEB | TCP 80 et 443 ; GLPI utilise TCP 443 |
-| ADMIN | TCP 22, 443 et 8006 pour les hyperviseurs et équipements selon service ; TCP 3389, 5986 et 9389 vers DC01 ; ICMP de diagnostic |
+| ADMIN | TCP 22, 443 et 8006 pour les hyperviseurs et équipements selon service ; TCP 3389, 5986 et 9389 vers le serveur Windows ; ICMP de diagnostic |
 | DHCP | Client UDP 68 vers serveur UDP 67 ; relais UDP 67 vers serveur UDP 67 ; réponses en sens inverse |
-| NTP | UDP 123 ; clients du domaine vers DC01 |
+| BASE | Port du moteur à confirmer, par exemple TCP 3306 pour MariaDB/MySQL |
+| ZABBIX | TCP 10050 vers les agents ; TCP 10051 vers le serveur/proxy, à confirmer |
+| SQUID | Port à confirmer, couramment TCP 3128 en proxy explicite |
+| NTP | UDP 123 ; clients du domaine vers le serveur Windows interne |
 
 AD_CLIENT vise les postes membres d’un domaine Windows récent. N’ajouter LDAPS TCP 636/3269 que si utilisé. La plage RPC et les besoins entre contrôleurs doivent être ajustés à la version Windows et aux rôles réellement déployés.
 
@@ -342,20 +351,24 @@ AD_CLIENT vise les postes membres d’un domaine Windows récent. N’ajouter LD
 
 | Ordre | Source | Destination | Service et action |
 | --- | --- | --- | --- |
-| 10 | Clients Wi-Fi et relais SW1 | DC01 et diffusion DHCP | Autoriser DHCP, y compris attribution initiale et renouvellement |
-| 20 | VLAN 10, 20, 30 et PC03 | DC01 192.168.50.20 | Autoriser DNS ; Wi-Fi limité à ce service interne |
-| 30 | VLAN 10, 20 et PC03 | DC01 192.168.50.20 | Autoriser AD_CLIENT |
-| 40 | VLAN 10, 20 et PC03 | GLPI01 192.168.50.30 | Autoriser HTTPS TCP 443 |
+| 10 | Clients Wi-Fi et relais SW1 | Windows interne et diffusion DHCP | Autoriser DHCP vers 192.168.50.11, y compris attribution initiale et renouvellement |
+| 20 | VLAN 10, 20, 30 et PC03 | Windows interne 192.168.50.11 | Autoriser DNS ; Wi-Fi limité à ce service interne |
+| 30 | VLAN 10, 20 et PC03 | Windows interne 192.168.50.11 | Autoriser AD_CLIENT |
+| 40 | VLAN 10, 20 et PC03 | GLPI sur 192.168.50.11 | Autoriser HTTPS TCP 443 |
+| 45 | VLAN autorisés | Squid 192.168.50.14 | Autoriser le port du proxy si le mode explicite est retenu |
 | 50 | PC03 192.168.40.10 | Équipements, hyperviseurs et VM | Autoriser ADMIN aux seules adresses inventoriées |
-| 60 | VLAN 10, 20 et PC03 | WEB01 10.0.20.10 | Autoriser WEB ; décision DMZ finale sur FW1 |
-| 70 | DC01 | DNSDMZ01 10.0.20.53 | Autoriser DNS ; redirection des noms externes |
+| 55 | Zabbix 192.168.50.13 | Hôtes supervisés des VLAN 10, 20, 30 et 40 | Autoriser ZABBIX uniquement vers les agents inventoriés |
+| 60 | VLAN 10, 20 et PC03 | Reverse proxy 10.0.20.3 | Autoriser WEB ; décision DMZ finale sur FW1 |
+| 70 | Windows interne 192.168.50.11 | DNS DMZ 10.0.20.2 | Autoriser DNS ; redirection des noms externes |
 | 80 | Serveurs et postes administrés | Clients autorisés et PC03 | Autoriser les retours des flux précédents selon protocole |
 | 90 | Hôtes de chaque VLAN | Leur propre passerelle | Autoriser ICMP de diagnostic |
 | 100 | Chaque VLAN | Autres réseaux privés | Refuser les autres échanges ; journaliser |
-| 110 | VLAN 10, 20, 30 et PC03 ; PC04, DC01, GLPI01 | Internet via FW1 | Autoriser WEB ; DC01 et PC04 peuvent utiliser NTP vers la source approuvée |
+| 110 | Hôtes explicitement autorisés, dont Squid si utilisé | Internet via FW1 | Autoriser les services nécessaires ; limiter la sortie directe si Squid devient obligatoire |
 | 999 | Toute source | Toute destination | Refuser et journaliser le reste |
 
 Appliquer les ACL en entrée des SVI 10, 20, 30, 40 et 50 après traduction de cette matrice dans la syntaxe du modèle. Une ACL IOS statique ne suit pas les sessions. Écrire les autorisations de retour pour chaque flux : réponses DNS UDP/TCP 53, réponses AD et NTP, DHCP relayé ou unicast, TCP ACK/RST vers le client et réponses ou erreurs ICMP nécessaires. Le mot-clé established vérifie ACK/RST et ne fournit pas une protection équivalente à celle de FW1. L’exemple ci-dessous couvre VLAN 30 ; il ne remplace pas les quatre autres ACL ni les règles locales des équipements.
+
+Les flux entre les VM internes `.11` à `.14` restent dans le VLAN 50 et ne passent pas par ces ACL. Autoriser localement uniquement le serveur Windows `.11` vers la base `.12` sur le port retenu, Zabbix `.13` vers les agents inventoriés et les clients autorisés vers Squid `.14`. De même, les flux du reverse proxy `.3` vers Web1-Web3 `.4` à `.6` restent sur le pont DMZ et doivent être limités sur Proxmox ou les pare-feu des VM.
 
 ### Exemple IOS pour le VLAN 30 isolé
 
@@ -367,10 +380,10 @@ ip access-list extended WIFI_IN
  10 remark DHCP initial et renouvellement
  20 permit udp host 0.0.0.0 eq 68 host 255.255.255.255 eq 67
  30 permit udp 192.168.30.0 0.0.0.255 eq 68 host 255.255.255.255 eq 67
- 40 permit udp 192.168.30.0 0.0.0.255 eq 68 host 192.168.50.20 eq 67
+ 40 permit udp 192.168.30.0 0.0.0.255 eq 68 host 192.168.50.11 eq 67
  50 remark DNS interne
- 60 permit udp 192.168.30.0 0.0.0.255 host 192.168.50.20 eq 53
- 70 permit tcp 192.168.30.0 0.0.0.255 host 192.168.50.20 eq 53
+ 60 permit udp 192.168.30.0 0.0.0.255 host 192.168.50.11 eq 53
+ 70 permit tcp 192.168.30.0 0.0.0.255 host 192.168.50.11 eq 53
  80 remark Diagnostic passerelle et retours AP1 vers PC03
  90 permit icmp 192.168.30.0 0.0.0.255 host 192.168.30.254 echo
  100 permit tcp host 192.168.30.2 host 192.168.40.10 established
@@ -397,16 +410,16 @@ Le groupe Internet exclut les réseaux privés 10.0.0.0/8, 172.16.0.0/12 et 192.
 | Ordre | Zone source et hôtes | Zone destination et hôtes | Service et action |
 | --- | --- | --- | --- |
 | 10 | Sessions déjà autorisées | Sens retour | Accepter les retours par suivi de session ; traiter les erreurs ICMP associées |
-| 20 | LAN ; PC03 | DMZ ; SRV1, WEB01, DNSDMZ01 | Autoriser ADMIN selon le service de chaque hôte |
-| 30 | LAN ; VLAN 10, 20 et PC03 | DMZ ; WEB01 10.0.20.10 | Autoriser TCP 80 et 443 |
-| 40 | LAN ; DC01 192.168.50.20 | DMZ ; DNSDMZ01 10.0.20.53 | Autoriser UDP et TCP 53 |
+| 20 | LAN ; PC03 | DMZ ; SRV1 et VM 10.0.20.2 à .6 | Autoriser ADMIN selon le service de chaque hôte |
+| 30 | LAN ; VLAN 10, 20 et PC03 | DMZ ; reverse proxy 10.0.20.3 | Autoriser TCP 80 et 443 |
+| 40 | LAN ; Windows interne 192.168.50.11 | DMZ ; DNS 10.0.20.2 | Autoriser UDP et TCP 53 |
 | 50 | DMZ ; toute source | LAN ; tous les VLAN | Refuser toute nouvelle session ; journaliser |
 | 60 | LAN ; PC03 | AMONT ; R1 10.0.0.254 | Autoriser HTTPS ou SSH si disponible, et ICMP |
 | 70 | LAN et DMZ ; toute autre source | AMONT ; réseaux privés | Refuser ; empêcher les contournements par une règle Internet large |
 | 80 | LAN ; hôtes autorisés par SW1 | AMONT ; Internet | Autoriser TCP 80 et 443 |
-| 90 | DMZ ; SRV1, WEB01, DNSDMZ01 | AMONT ; Internet | Autoriser TCP 80 et 443 pour mises à jour |
-| 100 | DMZ ; DNSDMZ01 | AMONT ; résolveurs externes approuvés | Autoriser UDP et TCP 53 uniquement |
-| 110 | LAN ; DC01 et PC04 ; DMZ ; SRV1, WEB01, DNSDMZ01 | AMONT ; serveurs NTP approuvés | Autoriser UDP 123 |
+| 90 | DMZ ; SRV1 et VM 10.0.20.2 à .6 | AMONT ; Internet | Autoriser TCP 80 et 443 pour mises à jour |
+| 100 | DMZ ; DNS 10.0.20.2 | AMONT ; résolveurs externes approuvés | Autoriser UDP et TCP 53 uniquement |
+| 110 | LAN ; serveurs autorisés ; DMZ ; SRV1 et VM .2 à .6 | AMONT ; serveurs NTP approuvés | Autoriser UDP 123 |
 | 999 | Toutes zones | Toutes destinations | Refuser et journaliser ; aucune publication WAN active |
 
 ### Politique sur R1
@@ -416,8 +429,8 @@ Le groupe Internet exclut les réseaux privés 10.0.0.0/8, 172.16.0.0/12 et 192.
 | 10 | Sessions sortantes autorisées | Sens retour | Accepter par suivi de session |
 | 20 | PC03 192.168.40.10 | R1 10.0.0.254 | Autoriser administration HTTPS ou SSH si disponible et ICMP |
 | 25 | PC03 en maintenance 192.168.0.10 | R1 port 5 ; 192.168.0.1 | Autoriser administration locale ; aucun routage vers les autres zones |
-| 30 | LAN et DMZ via FW1 ; ou FW1 .253 en mode double NAT | WAN | Autoriser les flux sortants déjà filtrés par FW1 et effectuer le NAT WAN |
-| 40 | WAN | Réseaux internes, DMZ et transit | Refuser toute nouvelle connexion ; journaliser |
+| 30 | LAN et DMZ via FW1 ; ou FW1 .253 en mode double NAT | Port 1 / réseau 172.16.50.0/24 | Autoriser les flux sortants déjà filtrés par FW1 et effectuer le NAT WAN |
+| 40 | Port 1 / réseau amont | Réseaux internes, DMZ et transit | Refuser toute nouvelle connexion ; journaliser |
 | 999 | Toute autre source | Administration de R1 | Refuser ; désactiver administration WAN et ouvertures automatiques UPnP |
 
 Le profil présenté concerne IPv4. Si IPv6 est utilisé, documenter son adressage et son filtrage avant mise en service ; les ACL IPv4 ne filtrent pas les paquets IPv6. Ne pas désactiver arbitrairement IPv6 sur Windows pour masquer un manque de règles.
@@ -428,18 +441,21 @@ Les résultats ci-dessous sont attendus, sans exécution sur le réseau à ce st
 
 | Contrôle | Vérification | Résultat attendu |
 | --- | --- | --- |
-| Interfaces et câbles | Comparer ports, VLAN, masques et voisins aux tableaux | 8 liens actifs ; C02 en réserve ; pas de SW2 en transit |
+| Interfaces et câbles | Comparer ports, VLAN, masques et voisins aux tableaux | 9 liens actifs ; C02 sur R1 port 1 ; pas de SW2 en transit |
 | Liaisons routées | SW1 vers 10.0.10.254 ; FW1 vers 10.0.0.254 et 10.0.20.1 | Voisins joignables avec diagnostics autorisés |
 | Routage retour | Vérifier les routes de R1 et FW1 ; tracer PC03 vers SRV1 | Passage SW1 puis FW1 ; pas de retour direct SRV1 vers R1 |
-| DHCP Wi-Fi | Libérer puis renouveler le bail sur un client VLAN 30 | IP .100 à .199 ; masque /24 ; GW .254 ; DNS 192.168.50.20 |
-| DNS | Résoudre les noms internes puis un nom Internet via DC01 | DC01 répond ; noms externes transmis à DNSDMZ01 |
+| DHCP Wi-Fi | Libérer puis renouveler le bail sur un client VLAN 30 | IP .100 à .199 ; masque /24 ; GW .254 ; DNS 192.168.50.11 |
+| DNS | Résoudre les noms internes puis un nom Internet via 192.168.50.11 | DNS interne joignable ; noms externes transmis à 10.0.20.2 |
 | Domaine | Joindre un poste VLAN 10 puis VLAN 20 ; ouvrir une session et appliquer une GPO | DNS, Kerberos, LDAP, SMB et RPC fonctionnent |
-| Applications | Depuis PC01 et PC02, ouvrir GLPI en HTTPS et WEB01 | Services accessibles ; certificats et noms cohérents |
+| Applications | Depuis PC01 et PC02, ouvrir GLPI sur 192.168.50.11 et le Web via 10.0.20.3 | Services accessibles ; certificats et noms cohérents ; trafic distribué à Web1-Web3 |
+| Base de données | Depuis le serveur Windows .11, joindre la base Debian .12 sur le port retenu ; répéter depuis un client | Flux applicatif autorisé ; client direct refusé |
+| Supervision | Vérifier les agents autorisés depuis Zabbix .13 et les tableaux de bord | Hôtes inventoriés remontés ; ports limités aux besoins Zabbix |
+| Proxy | Tester un client configuré vers Squid .14 puis un contournement direct | Navigation conforme au mode retenu ; contournement refusé si le proxy est obligatoire |
 | Administration | PC03 vers Proxmox TCP 8006 et équipements ; répéter depuis PC01 | PC03 autorisé ; PC01 refusé pour administration |
 | Gestion locale | PC03 branché successivement à R1 port 5 puis FW1 e0/0 | Accès à 192.168.0.1 puis 192.168.1.1 avec IP locale adaptée ; retour au VLAN 40 vérifié |
-| Isolation Wi-Fi | VLAN 30 vers PC01, GLPI01, Proxmox et WEB01 ; puis DNS et Internet | Accès privés refusés hors DNS et DHCP ; WEB Internet autorisé |
-| Isolation DMZ | WEB01 vers DC01 TCP 445 et PC03 TCP 3389 | Nouvelles connexions refusées par FW1 et journalisées |
-| Internet et NAT | Accès HTTPS depuis un poste LAN et WEB01 ; observer sessions et traduction | Sortie et retours valides ; pas de NAT LAN vers DMZ |
+| Isolation Wi-Fi | VLAN 30 vers PC01, GLPI, Proxmox et le reverse proxy ; puis DNS et Internet | Accès privés refusés hors DNS, DHCP et services explicitement retenus |
+| Isolation DMZ | Web1 10.0.20.4 vers le serveur Windows .11 TCP 445 et PC03 TCP 3389 | Nouvelles connexions refusées par FW1 et journalisées |
+| Internet et NAT | Accès HTTPS depuis un poste LAN et une VM DMZ ; observer R1 port 1 et la traduction | Sortie via 172.16.50.0/24 et retours valides ; pas de NAT LAN vers DMZ |
 | Persistance | Sauvegarder, redémarrer selon fenêtre de maintenance, refaire les tests essentiels | Configuration conservée ; résultats datés dans le compte rendu de recette |
 
 Exemples de contrôles depuis les postes Windows, selon le VLAN :
@@ -449,9 +465,9 @@ ipconfig /all
 route print -4
 ping 192.168.40.254
 tracert -d 10.0.20.1
-Resolve-DnsName -Name www.microsoft.com -Server 192.168.50.20
-Test-NetConnection 192.168.50.30 -Port 443
-Test-NetConnection 10.0.20.10 -Port 443
+Resolve-DnsName -Name www.microsoft.com -Server 192.168.50.11
+Test-NetConnection 192.168.50.11 -Port 443
+Test-NetConnection 10.0.20.3 -Port 443
 Test-NetConnection 10.0.20.1 -Port 8006
 ```
 
@@ -463,10 +479,10 @@ ipconfig /renew
 ipconfig /all
 ```
 
-Depuis une VM DMZ Linux, tenter une nouvelle connexion TCP vers DC01 puis vérifier le refus dans FW1 :
+Depuis une VM DMZ Linux, tenter une nouvelle connexion TCP vers le serveur Windows interne puis vérifier le refus dans FW1 :
 
 ```text
-nc -vz -w 3 192.168.50.20 445
+nc -vz -w 3 192.168.50.11 445
 ip route
 ```
 
@@ -474,9 +490,9 @@ L’outil nc doit être disponible. Un échec seul n’établit pas que le pare-
 
 ## 9 Sauvegarder et revenir en arrière
 
-Pour une maintenance locale dédiée, débrancher PC03 de SW1 port 15. Le raccorder au port 5 de R1 et utiliser temporairement 192.168.0.10/24 sans passerelle pour joindre 192.168.0.1 ; pour FW1, le raccorder à e0/0 et utiliser 192.168.1.10/24 sans passerelle pour joindre 192.168.1.1. Vérifier l’absence de conflit d’adresse. Le câble C02 peut servir s’il est libre, sinon réutiliser C07. Ces accès sont successifs et ne créent aucun pont entre réseaux.
+Pour une maintenance locale dédiée, débrancher PC03 de SW1 port 15. Le raccorder au port 5 de R1 et utiliser temporairement `192.168.0.10/24` sans passerelle pour joindre `192.168.0.1` ; pour FW1, le raccorder à e0/0 et utiliser `192.168.1.10/24` sans passerelle pour joindre `192.168.1.1`. Vérifier l’absence de conflit d’adresse. C02 étant affecté au WAN, réutiliser temporairement C07 ou prévoir un câble supplémentaire. Ces accès sont successifs et ne créent aucun pont entre réseaux.
 
-Après intervention, rétablir C07 vers SW1 port 15 puis 192.168.40.10/24, passerelle 192.168.40.254 et DNS 192.168.50.20 sur PC03. Un accès permanent simultané aux réseaux de gestion demanderait un raccordement supplémentaire, absent du schéma.
+Après intervention, rétablir C07 vers SW1 port 15 puis `192.168.40.10/24`, passerelle `192.168.40.254` et DNS `192.168.50.11` sur PC03. Un accès permanent simultané aux réseaux de gestion demanderait un raccordement supplémentaire, absent du schéma.
 
 Après réussite de la recette, sauvegarder SW1 avec copy running-config startup-config et exporter les configurations de FW1 et R1. Sauvegarder les VM et tester une restauration sur un environnement isolé. Conserver les résultats de recette et le mode NAT choisi avec les versions du matériel.
 
@@ -494,7 +510,7 @@ Le retrait rétablit un routage plus permissif : maintenir le réseau en mainten
 
 ## 10 Références
 
-Schéma de référence : TPAIS projet diagramme.pdf, commit 743c5c2 du 17 septembre 2026, intégré à main par 8476785. Le fichier original du schéma est conservé.
+Schéma de référence : `schéma réseau.pdf`, branche `yanis`, commit `2276171` du 18 septembre 2026.
 
 - [Cisco ACL](https://www.cisco.com/c/en/us/support/docs/ip/access-lists/26448-ACLsamples.html)
 - [Cisco relais DHCP](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr_dhcp/configuration/xe-16-11/dhcp-xe-16-11-book/dhcp-relay-agent-xe.html)
