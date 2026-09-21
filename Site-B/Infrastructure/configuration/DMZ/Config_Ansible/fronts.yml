@@ -1,0 +1,94 @@
+---
+- name: Amorce python3
+  hosts: fronts
+  gather_facts: false
+  tasks:
+    - name: Verifier python3
+      ansible.builtin.raw: python3 --version
+      register: py
+      changed_when: false
+      failed_when: false
+
+    - name: Installer python3 si absent
+      ansible.builtin.raw: apt-get update -qq && apt-get install -y -qq python3
+      when: py.rc != 0
+
+- name: Nginx sur les fronts
+  hosts: fronts
+  tasks:
+    - name: Installer nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Vhost front
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/front
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              root /var/www/html;
+              index index.html;
+
+              location = /healthz {
+                  access_log off;
+                  return 200 "ok\n";
+                  add_header Content-Type text/plain;
+              }
+
+              # location /api/ {
+              #     proxy_pass http://ADRESSE_DU_BACK:PORT/;
+              # }
+
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+
+              add_header X-Content-Type-Options nosniff always;
+          }
+      notify: Recharger nginx
+
+    - name: Activer le vhost
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/front
+        dest: /etc/nginx/sites-enabled/front
+        state: link
+      notify: Recharger nginx
+
+    - name: Retirer le vhost par defaut
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Recharger nginx
+
+    - name: Page nominative
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: "0644"
+      notify: Recharger nginx
+
+    - name: Valider la configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Verifier le service
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        return_content: true
+      register: page
+      failed_when: inventory_hostname not in page.content
+
+  handlers:
+    - name: Recharger nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
