@@ -1,13 +1,12 @@
 # Inventaire des configurations
 
-Cette liste est alignée sur `docs/schéma réseau.pdf`, branche `yanis`, commit `2276171` du 18 septembre 2026. Elle distingue les exemples disponibles des configurations qui restent à produire ou à exporter depuis les équipements.
+Cette liste est alignée sur `docs/schéma réseau.pdf`. Elle distingue la configuration disponible des configurations qui restent à produire ou à exporter depuis les équipements.
 
 ## Fichiers disponibles
 
 | Fichier | Cible | Contenu | État |
 | --- | --- | --- | --- |
-| [SW1_base_IOS_exemple.txt](SW1_base_IOS_exemple.txt) | SW1 Cisco | VLAN 10 à 50, ports d’accès, SVI, relais DHCP vers `192.168.50.11`, port 24 routé et route par défaut | Exemple à adapter au modèle et aux interfaces |
-| [SW1_WIFI_IN_exemple.txt](SW1_WIFI_IN_exemple.txt) | SW1 Cisco | ACL entrante du VLAN 30 avec DHCP et DNS vers `192.168.50.11` | Exemple partiel ; nécessite les retours sur le VLAN 50 |
+| [SW1.conf](SW1.conf) | SW1 Cisco | VLAN 10 à 50, ports d’accès, SVI, relais DHCP vers `192.168.50.11`, port 24 routé, route par défaut et ACL entrante du VLAN 30 | Configuration unique à adapter au modèle et aux interfaces |
 
 ## Configurations à préparer
 
@@ -15,7 +14,7 @@ Cette liste est alignée sur `docs/schéma réseau.pdf`, branche `yanis`, commit
 | --- | --- | --- |
 | R1 TP-Link | Port 1 sur le réseau amont `172.16.50.0/24` ; port 4 `10.0.0.254/29` ; port 5 `192.168.0.1/24` ; routes vers les VLAN et la DMZ via `10.0.0.253` ; NAT Internet sur le port 1 | Relever l’IP et la passerelle du port 1 ; confirmer le NAT des réseaux routés ; désactiver UPnP et l’administration WAN ; exporter la configuration |
 | FW1 Hillstone | e0/0 `192.168.1.1/24` gestion ; e0/1 `10.0.0.253/29` AMONT ; e0/2 `10.0.10.254/29` LAN ; e0/3 `10.0.20.254/24` proposée DMZ ; routes LAN via `10.0.10.253` ; défaut via `10.0.0.254` | Créer les objets `.11` à `.14` et `.2` à `.6` ; appliquer la matrice de règles ; conserver le suivi de session et les journaux ; exporter la configuration |
-| SW1 Cisco | Base fournie ; ACL complètes pour les VLAN 10, 20, 30, 40 et 50 ; éventuel accès d’administration | Vérifier le support L3, les noms d’interfaces, les compteurs ACL, le relais DHCP et la route par défaut ; sauvegarder la running-config validée |
+| SW1 Cisco | Configuration fournie dans `SW1.conf` ; ACL complémentaires éventuelles pour les VLAN 10, 20, 40 et 50 ; éventuel accès d’administration | Vérifier le support L3, les noms d’interfaces, les compteurs ACL, le relais DHCP et la route par défaut ; sauvegarder la running-config validée |
 | PC04 Proxmox | vmbr0 non étiqueté sur VLAN 50 ; gestion `192.168.50.10/24`, passerelle `192.168.50.254` ; VM `.11` à `.14` | Pare-feu local pour les flux intra-VLAN ; sauvegarde de la configuration réseau et des VM ; test de restauration |
 | SRV1 Proxmox | vmbr0 non étiqueté sur la DMZ ; gestion `10.0.20.1/24`, passerelle `10.0.20.254` ; VM `.2` à `.6` | Pare-feu local pour DNS, reverse proxy et backends Web ; sauvegarde de la configuration réseau et des VM ; test de restauration |
 | Windows interne | `192.168.50.11/24` ; AD DS, DNS, DHCP et GLPI ; DNS externe redirigé vers `10.0.20.2` | Définir domaine, nom d’hôte, certificats et sauvegarde système ; autoriser le DHCP dans AD ; limiter GLPI et l’accès base |
@@ -45,4 +44,4 @@ Cette liste est alignée sur `docs/schéma réseau.pdf`, branche `yanis`, commit
 - Moteur et port de la base Debian ; mode et port de Squid ; périmètre Zabbix.
 - Adresse proposée `10.0.20.254/24` de FW1 e0/3, à valider avant application.
 
-Les exemples de ce dossier ne doivent être sauvegardés sur les équipements qu’après inventaire du matériel, adaptation, accès console disponible et recette positive et négative.
+La configuration de ce dossier ne doit être sauvegardée sur l’équipement qu’après inventaire du matériel, adaptation, accès console disponible et recette positive et négative.

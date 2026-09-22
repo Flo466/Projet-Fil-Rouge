@@ -4,7 +4,7 @@ https://lucid.app/lucidchart/0ff5e866-ecdb-419e-8fa4-1ed153380d20/edit?viewport_
 
 Projet de préparation au titre professionnel Administrateur d’infrastructures sécurisées.
 
-La documentation décrit le réseau, son câblage, son adressage, ses services, son routage et sa politique de filtrage. Elle est alignée sur le schéma `docs/schéma réseau.pdf` de la branche `yanis`, au commit `2276171` du 18 septembre 2026.
+La documentation décrit le réseau, son câblage, son adressage, ses services, son routage et sa politique de filtrage. Elle est alignée sur le schéma `Infrastructure/docs/schéma réseau.pdf`.
 
 ## Documents
 
@@ -14,8 +14,7 @@ La documentation décrit le réseau, son câblage, son adressage, ses services, 
 | [Dossier technique](Infrastructure/docs/Dossier_reseau.md) | Inventaire, réseaux, hôtes, VM, câblage, routage, filtrage, mise en service et recette |
 | [Guide de configuration](Infrastructure/docs/Configuration_Reseau_Commandes.md) | Paramètres par équipement, exemples IOS et PowerShell, procédures de vérification et retour arrière |
 | [Inventaire des configurations](Infrastructure/configuration/README.md) | Liste des configurations à préparer, appliquer, vérifier et sauvegarder |
-| [Exemple de base SW1](Infrastructure/configuration/SW1_base_IOS_exemple.txt) | VLAN, ports, SVI, relais DHCP et routage IOS ; ACL à compléter avant mise en service |
-| [Exemple ACL Wi-Fi](Infrastructure/configuration/SW1_WIFI_IN_exemple.txt) | Filtre IPv4 entrant du VLAN 30 ; dépend aussi des autorisations de retour sur le VLAN 50 |
+| [Configuration SW1](Infrastructure/configuration/SW1.conf) | VLAN, ports, SVI, relais DHCP, routage IOS et filtre IPv4 entrant du VLAN 30 |
 
 ## Architecture actualisée
 
