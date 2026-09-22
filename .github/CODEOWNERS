@@ -1,0 +1,9 @@
+# CODEOWNERS
+# Ce fichier définit qui doit obligatoirement approuver les Pull Requests.
+# Pour être appliqué, l'option "Require review from Code Owners" doit être
+# activée dans le branch ruleset (Settings > Rules > Rulesets).
+#
+# Format : <pattern> <reviewer(s)>
+# Le pattern "*" s'applique à tous les fichiers du repo.
+
+* @alainsfr @Flo466 @yanisAitlamine
