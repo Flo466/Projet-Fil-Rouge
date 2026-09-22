@@ -1,0 +1,68 @@
+---
+- name: Installer Nginx sur les serveurs Web
+  hosts: fronts
+  become: true
+  tasks:
+    - name: Installer Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Installer le vhost applicatif
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/site-c-front
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              root /var/www/html;
+              index index.html;
+
+              location = /healthz {
+                  access_log off;
+                  return 200 "ok\n";
+                  add_header Content-Type text/plain;
+              }
+
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+
+              add_header X-Content-Type-Options nosniff always;
+          }
+      notify: Recharger Nginx
+
+    - name: Activer le vhost
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/site-c-front
+        dest: /etc/nginx/sites-enabled/site-c-front
+        state: link
+      notify: Recharger Nginx
+
+    - name: Désactiver le vhost par défaut
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Recharger Nginx
+
+    - name: Vérifier la configuration Nginx
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Tester la page de santé
+      ansible.builtin.uri:
+        url: http://127.0.0.1/healthz
+        return_content: true
+      register: health
+      failed_when: health.status != 200 or 'ok' not in health.content
+
+  handlers:
+    - name: Recharger Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
