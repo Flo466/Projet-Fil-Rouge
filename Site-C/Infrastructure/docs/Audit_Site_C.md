@@ -8,17 +8,17 @@ Cet audit compare les fichiers du dépôt avec la nouvelle consigne d'adressage 
 
 | Élément | Valeur retenue |
 | --- | --- |
-| Site | Site 2 - notre site |
-| Bloc | `172.16.64.0/18` |
+| Site | Site 3 - notre site |
+| Bloc | `172.16.128.0/18` |
 | Masque | `255.255.192.0` |
-| Plage | `172.16.64.0` à `172.16.127.255` |
+| Plage | `172.16.128.0` à `172.16.191.255` |
 | Découpage interne | Proposition `/24` par VLAN, à valider |
 
 ## Constats
 
 | ID | Niveau | Constat | Action |
 | --- | --- | --- | --- |
-| A-01 | Élevé | Les anciens fichiers utilisaient `192.168.0.0/28`, hors du bloc Site 2. | Remplacés dans les documents et les configurations de travail par `172.16.64.0/18`. |
+| A-01 | Élevé | Les anciens fichiers utilisaient `192.168.0.0/28`, hors du bloc Site 3. | Remplacés dans les documents et les configurations de travail par `172.16.128.0/18`. |
 | A-02 | Élevé | La photo ne fournit pas le découpage interne du `/18`. | Les `/24` utilisés ici sont marqués « à valider » partout. |
 | A-03 | Élevé | Une configuration ne peut pas être déclarée conforme sans preuve de l'équipement réel. | Relever running-config, câblage, tables MAC/ARP et résultats de tests. |
 | A-04 | Moyen | Les adresses WAN, le NAT, le domaine AD et les ports applicatifs ne sont pas fournis. | Compléter après inventaire et conserver les valeurs confirmées. |
@@ -30,7 +30,7 @@ Cet audit compare les fichiers du dépôt avec la nouvelle consigne d'adressage 
 - `Infrastructure/Routeur 2.txt` contient les interfaces, les routes, les ACL d'isolation de Proxmox 2 et SSH.
 - `Infrastructure/Plan_adressage_Site_C.md` centralise le bloc `/18` et le découpage de travail.
 - `Infrastructure/docs/Dossier_reseau.md` et `Configuration_Reseau_Commandes.md` utilisent les mêmes adresses.
-- `Infrastructure/configuration/DMZ/Config_Ansible` utilise les adresses du réseau applicatif de travail `172.16.74.0/24`.
+- `Infrastructure/configuration/DMZ/Config_Ansible` utilise les adresses du réseau applicatif de travail `172.16.138.0/24`.
 
 ## Preuves à recueillir sur la maquette
 
@@ -61,4 +61,4 @@ Tester au minimum : DNS/DHCP/AD depuis les VLAN 10, 20 et 40 ; Internet depuis l
 
 ## Conclusion
 
-La documentation et les configurations sont alignées sur le bloc `172.16.64.0/18` et conservent tous les VLAN et ACL demandés. Le site ne peut pas être déclaré conforme ou réellement déployé avant validation du découpage `/24` et collecte des preuves sur les équipements.
+La documentation et les configurations sont alignées sur le bloc `172.16.128.0/18` et conservent tous les VLAN et ACL demandés. Le site ne peut pas être déclaré conforme ou réellement déployé avant validation du découpage `/24` et collecte des preuves sur les équipements.

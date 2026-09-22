@@ -1,8 +1,8 @@
-# Dossier réseau - Site C / Site 2
+# Dossier réseau - Site C / Site 3
 
 ## 1. Référence d'adressage
 
-La consigne professeur attribue à notre site le bloc `172.16.64.0/18` avec le masque `255.255.192.0`. La plage globale va de `172.16.64.0` à `172.16.127.255`.
+La consigne professeur attribue à notre site le bloc `172.16.128.0/18` avec le masque `255.255.192.0`. La plage globale va de `172.16.128.0` à `172.16.191.255`.
 
 La consigne ne fournit pas le découpage interne. Pour garder les VLAN et les ACL exploitables, ce dépôt utilise un découpage de travail en `/24`, documenté dans [Plan_adressage_Site_C.md](../Plan_adressage_Site_C.md). Ce choix doit être validé avant tout déploiement réel.
 
@@ -10,27 +10,27 @@ La consigne ne fournit pas le découpage interne. Pour garder les VLAN et les AC
 
 | VLAN | Usage | Réseau de travail | Passerelle |
 | ---: | --- | --- | --- |
-| 10 | Service 1 | `172.16.64.0/24` | `172.16.64.1` |
-| 20 | Service 2 | `172.16.65.0/24` | `172.16.65.1` |
-| 30 | Serveurs | `172.16.66.0/24` | `172.16.66.1` |
-| 40 | Wi-Fi employés | `172.16.67.0/24` | `172.16.67.1` |
-| 50 | VoIP | `172.16.68.0/24` | `172.16.68.1` |
-| 60 | Wi-Fi invités | `172.16.69.0/24` | `172.16.69.1` |
-| 70 | Caméras IP | `172.16.70.0/24` | `172.16.70.1` |
-| 80 | Réserve | `172.16.71.0/24` | `172.16.71.1` |
-| 99 | Management | `172.16.72.0/24` | `172.16.72.1` |
+| 10 | Service 1 | `172.16.128.0/24` | `172.16.128.1` |
+| 20 | Service 2 | `172.16.129.0/24` | `172.16.129.1` |
+| 30 | Serveurs | `172.16.130.0/24` | `172.16.130.1` |
+| 40 | Wi-Fi employés | `172.16.131.0/24` | `172.16.131.1` |
+| 50 | VoIP | `172.16.132.0/24` | `172.16.132.1` |
+| 60 | Wi-Fi invités | `172.16.133.0/24` | `172.16.133.1` |
+| 70 | Caméras IP | `172.16.134.0/24` | `172.16.134.1` |
+| 80 | Réserve | `172.16.135.0/24` | `172.16.135.1` |
+| 99 | Management | `172.16.136.0/24` | `172.16.136.1` |
 
 | Rôle | Adresse de travail | Passerelle |
 | --- | --- | --- |
-| Windows AD/DNS/DHCP | `172.16.66.10/24` | `172.16.66.1` |
-| Zabbix | `172.16.66.11/24` | `172.16.66.1` |
-| IPBX | `172.16.66.12/24` | `172.16.66.1` |
-| Routeur 2 vers VLAN 30 | `172.16.66.254/24` | `172.16.66.1` |
-| Proxmox 2 | `172.16.74.2/24` | `172.16.74.1` |
-| Reverse proxy | `172.16.74.10/24` | `172.16.74.1` |
-| Web 1 / Web 2 | `172.16.74.11` / `.12` | `172.16.74.1` |
+| Windows AD/DNS/DHCP | `172.16.130.10/24` | `172.16.130.1` |
+| Zabbix | `172.16.130.11/24` | `172.16.130.1` |
+| IPBX | `172.16.130.12/24` | `172.16.130.1` |
+| Routeur 2 vers VLAN 30 | `172.16.130.254/24` | `172.16.130.1` |
+| Proxmox 2 | `172.16.138.2/24` | `172.16.138.1` |
+| Reverse proxy | `172.16.138.10/24` | `172.16.138.1` |
+| Web 1 / Web 2 | `172.16.138.11` / `.12` | `172.16.138.1` |
 
-Le transit vers Routeur 1 est proposé en `172.16.73.0/30` : SW-L3 `.2`, routeur `.1`. Le réseau applicatif de Routeur 2 est `172.16.74.0/24` dans le découpage de travail.
+Le transit vers Routeur 1 est proposé en `172.16.137.0/30` : SW-L3 `.2`, routeur `.1`. Le réseau applicatif de Routeur 2 est `172.16.138.0/24` dans le découpage de travail.
 
 ## 3. Ports et VLAN
 
@@ -50,20 +50,20 @@ Le VLAN 80 est créé mais aucun port ne lui est attribué tant que son usage n'
 
 ## 4. Routage et services
 
-Le SW-L3 route les VLAN et utilise `172.16.73.1` comme route par défaut. Routeur 2 utilise `172.16.66.1` comme route par défaut et dessert `172.16.74.0/24`. Windows Server fournit AD, DNS et DHCP sur `172.16.66.10`; les SVI clientes relaient DHCP vers cette adresse. Zabbix est proposé en `172.16.66.11`.
+Le SW-L3 route les VLAN et utilise `172.16.137.1` comme route par défaut. Routeur 2 utilise `172.16.130.1` comme route par défaut et dessert `172.16.138.0/24`. Windows Server fournit AD, DNS et DHCP sur `172.16.130.10`; les SVI clientes relaient DHCP vers cette adresse. Zabbix est proposé en `172.16.130.11`.
 
-Le reverse proxy `172.16.74.10` est la seule cible Web autorisée. Web 1 et Web 2 restent derrière Routeur 2. Les interfaces d'administration ne sont accessibles que depuis le VLAN 99.
+Le reverse proxy `172.16.138.10` est la seule cible Web autorisée. Web 1 et Web 2 restent derrière Routeur 2. Les interfaces d'administration ne sont accessibles que depuis le VLAN 99.
 
 ## 5. Politique ACL
 
-- VLAN 10 et 20 : DNS, DHCP, AD et HTTPS vers `172.16.66.10`, puis Internet ; autres réseaux internes refusés.
+- VLAN 10 et 20 : DNS, DHCP, AD et HTTPS vers `172.16.130.10`, puis Internet ; autres réseaux internes refusés.
 - VLAN 40 : mêmes services d'entreprise, accès aux VLAN 10/20 selon besoin ; autres réseaux privés refusés.
-- VLAN 50 : DHCP/DNS et IPBX `172.16.66.12` ; autres réseaux internes refusés.
+- VLAN 50 : DHCP/DNS et IPBX `172.16.130.12` ; autres réseaux internes refusés.
 - VLAN 60 : DHCP, DNS et Internet uniquement ; aucun accès privé.
-- VLAN 70 : supervision Zabbix `172.16.66.11:10051` uniquement ; autres flux refusés.
+- VLAN 70 : supervision Zabbix `172.16.130.11:10051` uniquement ; autres flux refusés.
 - VLAN 80 : bloqué en attente d'un usage.
 - VLAN 99 : administration SSH/HTTPS/8006 et diagnostic vers les équipements et serveurs autorisés.
-- Zone `172.16.74.0/24` : reverse proxy vers Web 1/Web 2 ; pas de nouvelles connexions vers les VLAN internes.
+- Zone `172.16.138.0/24` : reverse proxy vers Web 1/Web 2 ; pas de nouvelles connexions vers les VLAN internes.
 
 Les ACL sont dans `Infrastructure/Switch L3.txt` et `Infrastructure/Routeur 2.txt`. Les règles sont des modèles ; vérifier les retours TCP/UDP/ICMP et les compteurs avant sauvegarde.
 

@@ -1,7 +1,7 @@
-! Site C / Site 2 - Routeur 2
+! Site C / Site 3 - Routeur 2
 ! Decoupage de travail a valider :
-! VLAN 30 = 172.16.66.0/24, SW-L3 = .1, Routeur 2 = .254
-! Reseau Proxmox 2 / DMZ = 172.16.74.0/24, Routeur 2 = .1
+! VLAN 30 = 172.16.130.0/24, SW-L3 = .1, Routeur 2 = .254
+! Reseau Proxmox 2 / DMZ = 172.16.138.0/24, Routeur 2 = .1
 !
 enable
 configure terminal
@@ -11,27 +11,27 @@ no ip domain-lookup
 ! Interface 1 vers le switch L3, dans le VLAN 30
 interface GigabitEthernet0/0
  description VERS_SW-L3_VLAN30
- ip address 172.16.66.254 255.255.255.0
+ ip address 172.16.130.254 255.255.255.0
  no shutdown
 exit
 
 ! Interface 2 vers Proxmox 2 et la DMZ applicative
 interface GigabitEthernet0/1
  description VERS_PROXMOX2_DMZ
- ip address 172.16.74.1 255.255.255.0
+ ip address 172.16.138.1 255.255.255.0
  no shutdown
 exit
 
 ! Routes retour vers les VLAN derriere le SW-L3
-ip route 172.16.64.0 255.255.255.0 172.16.66.1
-ip route 172.16.65.0 255.255.255.0 172.16.66.1
-ip route 172.16.67.0 255.255.255.0 172.16.66.1
-ip route 172.16.68.0 255.255.255.0 172.16.66.1
-ip route 172.16.69.0 255.255.255.0 172.16.66.1
-ip route 172.16.70.0 255.255.255.0 172.16.66.1
-ip route 172.16.71.0 255.255.255.0 172.16.66.1
-ip route 172.16.72.0 255.255.255.0 172.16.66.1
-ip route 0.0.0.0 0.0.0.0 172.16.66.1
+ip route 172.16.128.0 255.255.255.0 172.16.130.1
+ip route 172.16.129.0 255.255.255.0 172.16.130.1
+ip route 172.16.131.0 255.255.255.0 172.16.130.1
+ip route 172.16.132.0 255.255.255.0 172.16.130.1
+ip route 172.16.133.0 255.255.255.0 172.16.130.1
+ip route 172.16.134.0 255.255.255.0 172.16.130.1
+ip route 172.16.135.0 255.255.255.0 172.16.130.1
+ip route 172.16.136.0 255.255.255.0 172.16.130.1
+ip route 0.0.0.0 0.0.0.0 172.16.130.1
 
 ! SSH reserve au VLAN 99 de management
 ip domain name site-c.local
@@ -39,7 +39,7 @@ username admin privilege 15 secret A_REMPLACER
 crypto key generate rsa modulus 2048
 ip ssh version 2
 ip access-list standard SSH_MANAGEMENT_ONLY
- permit 172.16.72.0 0.0.0.255
+ permit 172.16.136.0 0.0.0.255
  deny any log
 exit
 line vty 0 15
@@ -53,21 +53,21 @@ exit
 ! Les VLAN 10, 20 et 40 peuvent atteindre le reverse proxy en HTTP/HTTPS.
 ip access-list extended R2_FROM_LAN
  remark Administration R2 depuis le VLAN 99
- permit tcp 172.16.72.0 0.0.0.255 host 172.16.66.254 eq 22
- permit icmp 172.16.72.0 0.0.0.255 host 172.16.66.254
+ permit tcp 172.16.136.0 0.0.0.255 host 172.16.130.254 eq 22
+ permit icmp 172.16.136.0 0.0.0.255 host 172.16.130.254
  remark Acces Web au reverse proxy uniquement
- permit tcp 172.16.64.0 0.0.0.255 host 172.16.74.10 eq 80
- permit tcp 172.16.64.0 0.0.0.255 host 172.16.74.10 eq 443
- permit tcp 172.16.65.0 0.0.0.255 host 172.16.74.10 eq 80
- permit tcp 172.16.65.0 0.0.0.255 host 172.16.74.10 eq 443
- permit tcp 172.16.67.0 0.0.0.255 host 172.16.74.10 eq 80
- permit tcp 172.16.67.0 0.0.0.255 host 172.16.74.10 eq 443
+ permit tcp 172.16.128.0 0.0.0.255 host 172.16.138.10 eq 80
+ permit tcp 172.16.128.0 0.0.0.255 host 172.16.138.10 eq 443
+ permit tcp 172.16.129.0 0.0.0.255 host 172.16.138.10 eq 80
+ permit tcp 172.16.129.0 0.0.0.255 host 172.16.138.10 eq 443
+ permit tcp 172.16.131.0 0.0.0.255 host 172.16.138.10 eq 80
+ permit tcp 172.16.131.0 0.0.0.255 host 172.16.138.10 eq 443
  remark Administration du reseau applicatif depuis VLAN 99
- permit tcp 172.16.72.0 0.0.0.255 172.16.74.0 0.0.0.255 eq 22
- permit tcp 172.16.72.0 0.0.0.255 172.16.74.0 0.0.0.255 eq 8006
- permit icmp 172.16.72.0 0.0.0.255 172.16.74.0 0.0.0.255
- deny ip 172.16.64.0 0.0.63.255 172.16.74.0 0.0.0.255 log
- deny ip any 172.16.74.0 0.0.0.255 log
+ permit tcp 172.16.136.0 0.0.0.255 172.16.138.0 0.0.0.255 eq 22
+ permit tcp 172.16.136.0 0.0.0.255 172.16.138.0 0.0.0.255 eq 8006
+ permit icmp 172.16.136.0 0.0.0.255 172.16.138.0 0.0.0.255
+ deny ip 172.16.128.0 0.0.63.255 172.16.138.0 0.0.0.255 log
+ deny ip any 172.16.138.0 0.0.0.255 log
 exit
 interface GigabitEthernet0/0
  ip access-group R2_FROM_LAN in
@@ -75,10 +75,10 @@ exit
 
 ! Flux de la DMZ vers le LAN : retours etablis seulement et aucun nouveau flux.
 ip access-list extended R2_FROM_DMZ
- permit tcp 172.16.74.0 0.0.0.255 172.16.64.0 0.0.63.255 established
- permit icmp 172.16.74.0 0.0.0.255 172.16.64.0 0.0.63.255 echo-reply
- deny ip 172.16.74.0 0.0.0.255 172.16.64.0 0.0.63.255 log
- deny ip 172.16.74.0 0.0.0.255 any log
+ permit tcp 172.16.138.0 0.0.0.255 172.16.128.0 0.0.63.255 established
+ permit icmp 172.16.138.0 0.0.0.255 172.16.128.0 0.0.63.255 echo-reply
+ deny ip 172.16.138.0 0.0.0.255 172.16.128.0 0.0.63.255 log
+ deny ip 172.16.138.0 0.0.0.255 any log
 exit
 interface GigabitEthernet0/1
  ip access-group R2_FROM_DMZ in
@@ -90,5 +90,5 @@ write memory
 ! show ip interface brief
 ! show ip route
 ! show access-lists
-! ping 172.16.66.1
-! ping 172.16.74.2
+! ping 172.16.130.1
+! ping 172.16.138.2

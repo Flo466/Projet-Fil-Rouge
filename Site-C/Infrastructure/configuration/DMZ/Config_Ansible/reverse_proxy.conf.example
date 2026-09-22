@@ -1,8 +1,8 @@
-# Exemple Nginx pour le reverse proxy 172.16.74.10.
-# Les adresses suivent le decoupage de travail du bloc 172.16.64.0/18.
+# Exemple Nginx pour le reverse proxy 172.16.138.10.
+# Les adresses suivent le decoupage de travail du bloc 172.16.128.0/18.
 upstream site_c_web {
-    server 172.16.74.11:80;
-    server 172.16.74.12:80 backup;
+    server 172.16.138.11:80;
+    server 172.16.138.12:80 backup;
 }
 
 server {
