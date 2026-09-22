@@ -1,12 +1,12 @@
-# Ordre de déploiement Site C
+# Ordre de déploiement Web - Site C
 
 | Étape | Action | Dépendance |
 | ---: | --- | --- |
-| 1 | Valider Routeur 2, Proxmox 2 et `192.168.200.0/24` | Routage et filtrage |
-| 2 | Installer Web 1 `192.168.200.11` et Web 2 `192.168.200.12` | Proxmox 2 |
-| 3 | Tester Nginx et `/healthz` avec `fronts.yml` | SSH et Python 3 |
-| 4 | Installer le reverse proxy `192.168.200.10` | Web 1 et Web 2 |
-| 5 | Appliquer les règles Routeur 2 et SW-L3 | Services testés |
-| 6 | Effectuer la recette positive et négative | Tout le reste |
+| 1 | Valider le découpage du bloc `172.16.64.0/18` et le réseau applicatif `172.16.74.0/24` | Validation du plan |
+| 2 | Configurer Routeur 2 et Proxmox 2 | Routage et filtrage |
+| 3 | Installer Web 1 `172.16.74.11` et Web 2 `172.16.74.12` | Proxmox 2 |
+| 4 | Tester Nginx et `/healthz` avec `fronts.yml` | SSH et Python 3 |
+| 5 | Installer le reverse proxy `172.16.74.10` | Web 1 et Web 2 |
+| 6 | Appliquer les règles ACL et effectuer la recette | Services testés |
 
 Ne pas publier le reverse proxy avant d'avoir validé les routes retour, les journaux de filtrage et les certificats.

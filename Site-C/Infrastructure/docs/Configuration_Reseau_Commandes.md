@@ -1,8 +1,8 @@
-# Guide de configuration - Site C
+# Guide de configuration - Site C / Site 2
 
-Ce guide accompagne `Dossier_reseau.md` et `Infrastructure/Switch L3.txt`. Il reprend le plan `/28` de Site C. Les exemples doivent être adaptés au matériel et testés en console.
+Le bloc professeur est `172.16.64.0/18` (`255.255.192.0`). Les commandes utilisent le découpage de travail `/24` par VLAN décrit dans `Plan_adressage_Site_C.md`. Faire valider ce découpage avant application.
 
-## 1. Contrôles avant changement
+## 1. Sauvegarde et inventaire
 
 ```text
 show version
@@ -10,92 +10,75 @@ show inventory
 show interfaces status
 show running-config
 show startup-config
+show vlan brief
 ```
 
-Sauvegarder la configuration avant la modification. Vérifier que le switch prend en charge le routage L3, les SVI, les ACL et le relais DHCP.
+Conserver les exports initiaux et vérifier les noms d'interfaces avant de coller la configuration.
 
-## 2. VLAN et passerelles
-
-Le masque est `255.255.255.240` pour chaque VLAN. Les passerelles sont :
+## 2. Passerelles de travail
 
 ```text
-VLAN 10  192.168.0.1
-VLAN 20  192.168.0.17
-VLAN 30  192.168.0.33
-VLAN 40  192.168.0.49
-VLAN 50  192.168.0.65
-VLAN 60  192.168.0.81
-VLAN 70  192.168.0.97
-VLAN 80  192.168.0.113
-VLAN 99  192.168.0.129
+VLAN 10  172.16.64.1/24
+VLAN 20  172.16.65.1/24
+VLAN 30  172.16.66.1/24
+VLAN 40  172.16.67.1/24
+VLAN 50  172.16.68.1/24
+VLAN 60  172.16.69.1/24
+VLAN 70  172.16.70.1/24
+VLAN 80  172.16.71.1/24
+VLAN 99  172.16.72.1/24
 ```
 
-Le fichier `Switch L3.txt` contient les interfaces et les ACL complètes. Ne pas recopier une adresse `/24` du planning Site A.
+Le serveur AD/DNS/DHCP de travail est `172.16.66.10`. Les SVI clientes utilisent `ip helper-address 172.16.66.10`.
 
-## 3. Transit vers Routeur 1
+## 3. SW-L3 et transit
 
-Le transit historique `192.168.0.0/30` est incompatible avec le VLAN 10. La proposition utilisée dans les exemples est :
+Le fichier `Infrastructure/Switch L3.txt` contient les noms de VLAN, les ports, les SVI, les ACL et le SSH. Le port 24 utilise le transit de travail suivant :
 
 ```text
 interface GigabitEthernet1/0/24
- description TRANSIT_ROUTEUR1_PROPOSE
+ description TRANSIT_ROUTEUR1
  no switchport
- ip address 192.168.254.2 255.255.255.252
+ ip address 172.16.73.2 255.255.255.252
  no shutdown
 exit
-ip route 0.0.0.0 0.0.0.0 192.168.254.1
+ip route 0.0.0.0 0.0.0.0 172.16.73.1
+ip route 172.16.74.0 255.255.255.0 172.16.66.254
 ```
 
-Sur Routeur 1, ajouter les routes vers les blocs du plan via `192.168.254.2`, puis le NAT de sortie vers le WAN réel. L'adresse WAN et sa passerelle ne sont pas fournies dans les documents.
+## 4. Routeur 2
 
-## 4. Routeur 2 et Proxmox 2
-
-Le planning demande une liaison Routeur 2-SW-L3 et une seconde interface vers Proxmox 2. L'adaptation proposée est :
+Le fichier `Infrastructure/Routeur 2.txt` contient les interfaces, les routes, les ACL et le SSH :
 
 ```text
-Routeur 2, interface VLAN 30 : 192.168.0.46/28
-Routeur 2, interface Proxmox 2 : 192.168.200.1/24
-Proxmox 2 : 192.168.200.2/24, passerelle 192.168.200.1
+interface GigabitEthernet0/0
+ description VERS_SW-L3_VLAN30
+ ip address 172.16.66.254 255.255.255.0
+ no shutdown
+interface GigabitEthernet0/1
+ description VERS_PROXMOX2_DMZ
+ ip address 172.16.74.1 255.255.255.0
+ no shutdown
+ip route 0.0.0.0 0.0.0.0 172.16.66.1
 ```
 
-Le switch doit utiliser la route suivante si le réseau applicatif doit être joignable depuis un réseau autorisé :
+Les flux Web passent par `172.16.74.10`. Proxmox 2 est `172.16.74.2`, Web 1 `.11` et Web 2 `.12` dans le plan de travail.
+
+## 5. Contrôles et recette
 
 ```text
-ip route 192.168.200.0 255.255.255.0 192.168.0.46
-```
-
-Ne pas publier Routeur 2, Proxmox ou leur administration sur Internet. Les règles de filtrage doivent limiter la zone applicative au reverse proxy et aux flux d'administration autorisés.
-
-## 5. Windows Server, DHCP et DNS
-
-Proposition : Windows Server `192.168.0.34/28`, passerelle `192.168.0.33`. Créer une étendue par VLAN avec la passerelle de la ligne correspondante et le DNS `192.168.0.34`. Activer `ip helper-address 192.168.0.34` sur les SVI clientes.
-
-Vérifications Windows :
-
-```text
-ipconfig /all
-ipconfig /renew
-nslookup domaine.local 192.168.0.34
-```
-
-Le domaine, les plages DHCP et les redirecteurs DNS doivent être confirmés avant déploiement.
-
-## 6. Contrôles du switch
-
-```text
-show vlan brief
-show interfaces status
 show ip interface brief
 show ip route
+show access-lists
 show ip interface Vlan30
-show ip access-lists
-ping 192.168.0.33
-ping 192.168.254.1
+ping 172.16.66.1
+ping 172.16.73.1
+ping 172.16.74.2
 copy running-config startup-config
 ```
 
-Tester depuis un poste de chaque VLAN un flux autorisé et un flux interdit. Vérifier les compteurs ACL et les journaux de refus.
+Depuis un poste de chaque VLAN, tester un flux autorisé et un flux interdit. Vérifier les compteurs ACL, les journaux, les routes aller et retour, le DHCP, le DNS et le reverse proxy.
 
-## 7. Retour arrière
+## 6. Retour arrière
 
-Conserver la configuration précédente hors de l'équipement. En cas de perte d'accès après une ACL, utiliser la console, retirer l'ACL de l'interface concernée, rétablir les routes précédentes et refaire les tests avant toute nouvelle sauvegarde.
+En cas de perte d'accès après une ACL, utiliser la console, retirer l'ACL de l'interface concernée, restaurer la configuration sauvegardée et refaire la recette. Ne pas remplacer un refus par une autorisation globale permanente.

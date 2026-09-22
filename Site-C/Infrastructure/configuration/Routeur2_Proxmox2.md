@@ -1,44 +1,41 @@
 # Routeur 2 et Proxmox 2
 
-Le planning demande d'isoler le second serveur Proxmox derrière un deuxième routeur. Le planning historique indique `192.168.30.253/24` côté switch, mais cette adresse chevauche désormais le plan de Site C. La valeur adaptée proposée ici est `192.168.0.46/28`, dernière adresse utilisable du VLAN 30.
+Le planning demande d'isoler le second serveur Proxmox derrière Routeur 2. Le bloc du professeur pour Site C est `172.16.64.0/18`. Le découpage ci-dessous est celui utilisé dans les configurations du dépôt et reste à valider.
 
-## Adressage proposé
+## Adressage de travail
 
-| Équipement | Interface | Adresse | Réseau | Rôle |
+| Équipement | Interface | Adresse | Passerelle | Rôle |
 | --- | --- | --- | --- | --- |
-| SW-L3 | SVI VLAN 30 | `192.168.0.33/28` | VLAN 30 | Passerelle des serveurs |
-| Routeur 2 | Interface 1 vers VLAN 30 | `192.168.0.46/28` | VLAN 30 | Liaison vers le réseau principal |
-| Routeur 2 | Interface 2 vers Proxmox 2 | `192.168.200.1/24` | Réseau isolé | Passerelle du second hyperviseur |
-| Proxmox 2 | Carte de gestion | `192.168.200.2/24` | Réseau isolé | Hôte de virtualisation |
-| Reverse proxy | VM | `192.168.200.10/24` | Réseau isolé | Seule cible d'une future publication Web |
-| Web 1 | VM | `192.168.200.11/24` | Réseau isolé | Serveur Web |
-| Web 2 | VM | `192.168.200.12/24` | Réseau isolé | Serveur Web de secours ou second site |
+| SW-L3 | SVI VLAN 30 | `172.16.66.1/24` | - | Passerelle des serveurs |
+| Routeur 2 | Interface vers VLAN 30 | `172.16.66.254/24` | `172.16.66.1` | Liaison vers le réseau principal |
+| Routeur 2 | Interface vers Proxmox 2 | `172.16.74.1/24` | - | Passerelle applicative |
+| Proxmox 2 | Carte de gestion | `172.16.74.2/24` | `172.16.74.1` | Hôte de virtualisation |
+| Reverse proxy | VM | `172.16.74.10/24` | `172.16.74.1` | Seule cible Web publiée |
+| Web 1 | VM | `172.16.74.11/24` | `172.16.74.1` | Serveur Web |
+| Web 2 | VM | `172.16.74.12/24` | `172.16.74.1` | Serveur Web de secours |
 
-Les adresses `192.168.0.46/28` et `192.168.200.0/24` sont des propositions à valider avec l'équipe. Le masque et l'adresse de Proxmox 2 n'étaient pas fixés dans le planning.
+## Routage
 
-## Règles de routage
-
-Routeur 2 doit avoir une route par défaut vers `192.168.0.33` côté VLAN 30. Le switch L3 doit avoir une route vers `192.168.200.0/24` via `192.168.0.46` :
+Routeur 2 possède une route par défaut vers le SW-L3 :
 
 ```text
-ip route 192.168.200.0 255.255.255.0 192.168.0.46
+ip route 0.0.0.0 0.0.0.0 172.16.66.1
 ```
 
-Si le switch ne doit pas exposer le réseau applicatif aux autres VLAN, cette route doit être filtrée par l'ACL de chaque SVI. Les retours de Routeur 1 vers `192.168.200.0/24` doivent passer par le switch puis Routeur 2, ou être masqués par Routeur 2 selon le choix NAT documenté.
+Le SW-L3 doit connaître le réseau applicatif :
 
-## Filtrage minimal
+```text
+ip route 172.16.74.0 255.255.255.0 172.16.66.254
+```
 
-- Autoriser depuis le VLAN 99 d'administration les seuls ports SSH/HTTPS nécessaires à Routeur 2, Proxmox 2 et au reverse proxy.
-- Autoriser depuis le VLAN 30 l'administration et les mises à jour nécessaires ; ne pas autoriser l'accès direct aux serveurs Web depuis les VLAN utilisateurs.
-- Autoriser vers le reverse proxy uniquement TCP 80/443 depuis les réseaux explicitement retenus.
-- Autoriser le reverse proxy vers Web 1 et Web 2 sur le port applicatif retenu.
-- Refuser toute nouvelle connexion du réseau `192.168.200.0/24` vers les VLAN utilisateurs et le VLAN 99 ; autoriser seulement les réponses aux sessions suivies.
-- Ne publier ni Proxmox 2, ni Routeur 2, ni les interfaces d'administration.
+Routeur 1 doit avoir une route vers `172.16.74.0/24` via le transit du SW-L3, si ce réseau doit sortir vers Internet. Les routes et le NAT ne doivent être appliqués qu'après validation du découpage.
 
-## Mise en service
+## Filtrage
 
-1. Sauvegarder les configurations et relever les interfaces réelles.
-2. Raccorder Routeur 2 au port access ou au trunk du VLAN 30 selon le modèle du switch.
-3. Configurer les deux interfaces, puis vérifier `192.168.0.33` et `192.168.200.1` depuis des postes autorisés.
-4. Configurer le pont Proxmox 2 et ses VM sans activer de publication WAN.
-5. Tester les routes, les règles positives et les refus, puis sauvegarder.
+- VLAN 10, 20 et 40 : HTTP/HTTPS vers le reverse proxy uniquement.
+- VLAN 99 : SSH/HTTPS/8006 et ICMP d'administration vers Routeur 2, Proxmox et les VM autorisées.
+- Reverse proxy : HTTP/HTTPS vers Web 1 et Web 2.
+- Réseau `172.16.74.0/24` : aucune nouvelle connexion vers les VLAN internes ; seuls les retours établis sont autorisés.
+- Aucun accès Internet direct à Routeur 2, Proxmox ou aux interfaces d'administration.
+
+La configuration complète est dans `Infrastructure/Routeur 2.txt`. Tester chaque règle par un flux autorisé et un flux refusé avant `write memory`.

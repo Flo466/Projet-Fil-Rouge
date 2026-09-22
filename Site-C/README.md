@@ -1,42 +1,37 @@
-# Site C
+# Site C / Site 2
 
-Documentation du réseau, des services et de la mise en service du site C.
+Documentation du réseau, des services et de l'audit de Site C.
 
-Le plan d'adressage de Site C utilise des sous-réseaux `/28` dans `192.168.0.0/24`. Les anciennes adresses `/24` du planning générique ne sont donc pas reprises lorsqu'elles chevauchent ces réseaux.
+La nouvelle consigne professeur attribue à notre site le bloc global `172.16.64.0/18` (`255.255.192.0`). Pour conserver les VLAN, les passerelles et les ACL déjà préparés, les fichiers utilisent un découpage de travail en `/24` par VLAN. Ce découpage doit être validé avant mise en production.
 
 ## Documents
 
 | Document | Contenu |
 | --- | --- |
-| [Plan d'adressage](Infrastructure/nouveau%20adressage.pdf) | Réseaux, passerelles, hôtes et masques de Site C |
-| [Planning Sprint 3](Infrastructure/Planning_Site_A_sprint3_routeur2.pdf) | Services, supervision, Routeur 2, Proxmox 2 et reverse proxy |
+| [Plan d'adressage](Infrastructure/Plan_adressage_Site_C.md) | Bloc `/18`, VLAN, passerelles et sous-réseaux de travail |
+| [Audit Site C](Infrastructure/docs/Audit_Site_C.md) | Écarts connus, preuves disponibles et plan de contrôle |
+| [Planning Sprint 3](Infrastructure/Planning_Site_A_sprint3_routeur2.pdf) | Services, Routeur 2, Proxmox 2 et reverse proxy |
 | [Dossier réseau](Infrastructure/docs/Dossier_reseau.md) | Architecture, services, routage et filtrage |
-| [Guide de configuration](Infrastructure/docs/Configuration_Reseau_Commandes.md) | Commandes IOS et paramètres de mise en service |
-| [Inventaire des configurations](Infrastructure/configuration/README.md) | Fichiers à préparer et vérifier |
-| [Configuration Switch L3](Infrastructure/Switch%20L3.txt) | Exemple IOS adapté au plan `/28` |
-| [Routeur 2 et Proxmox 2](Infrastructure/configuration/Routeur2_Proxmox2.md) | Isolation du second hyperviseur et réseau applicatif |
+| [Guide de configuration](Infrastructure/docs/Configuration_Reseau_Commandes.md) | Commandes de vérification et de mise en service |
+| [Inventaire des configurations](Infrastructure/configuration/README.md) | Fichiers à préparer, appliquer et sauvegarder |
+| [Configuration Switch L3](Infrastructure/Switch%20L3.txt) | VLAN, noms, ports, SVI, ACL, relais DHCP et SSH |
+| [Configuration Routeur 2](Infrastructure/Routeur%202.txt) | Interfaces, routes, ACL d'isolation et SSH |
 
-## Architecture
+## Découpage de travail
 
 ```text
-Internet -- Routeur 1 / pare-feu -- transit proposé -- SW-L3
-                                      192.168.254.0/30
-                                             |
-             +-------------------------------+------------------+
-             |                                                  |
-      VLAN 10, 20, 40, 50, 60, 70, 80                    VLAN 30
-      postes, Wi-Fi, VoIP, caméras                       serveurs
-                                                        192.168.0.32/28
-                                                               |
-                                                   AD/DNS/DHCP, Zabbix
-                                                               |
-                                                   Routeur 2 .46 proposé
-                                                               |
-                                                   192.168.200.0/24 proposé
-                                                               |
-                                                   Proxmox 2, proxy, Web
+Site 2 : 172.16.64.0/18
+  VLAN 10 : 172.16.64.0/24  GW .1
+  VLAN 20 : 172.16.65.0/24  GW .1
+  VLAN 30 : 172.16.66.0/24  GW .1
+  VLAN 40 : 172.16.67.0/24  GW .1
+  VLAN 50 : 172.16.68.0/24  GW .1
+  VLAN 60 : 172.16.69.0/24  GW .1
+  VLAN 70 : 172.16.70.0/24  GW .1
+  VLAN 80 : 172.16.71.0/24  GW .1
+  VLAN 99 : 172.16.72.0/24  GW .1
+  Transit R1 : 172.16.73.0/30
+  DMZ/Proxmox 2 : 172.16.74.0/24
 ```
 
-Les passerelles du plan fourni sont `.1`, `.17`, `.33`, `.49`, `.65`, `.81`, `.97`, `.113` et `.129` pour les VLAN 10, 20, 30, 40, 50, 60, 70, 80 et 99. Le transit vers Routeur 1 et le réseau de Proxmox 2 sont proposés séparément, car le planning historique `192.168.0.0/30` entrerait en conflit avec le VLAN 10.
-
-Les fichiers décrivent une cible de configuration. Les modèles, ports physiques, adresse WAN, domaine, NAT et ports applicatifs doivent être relevés avant application. Les commandes IOS sont des exemples à adapter au switch réel.
+Les adresses et le masque `/18` de la photo sont la référence. Le détail `/24` ci-dessus est une proposition de travail, pas une validation du professeur. L'ancien `nouveau adressage.pdf` est conservé comme historique et ne doit plus être appliqué.

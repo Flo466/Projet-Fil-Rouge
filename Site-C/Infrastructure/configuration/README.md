@@ -1,42 +1,39 @@
 # Inventaire des configurations de Site C
 
-Les fichiers de ce dossier sont alignés sur `../nouveau adressage.pdf`. Les réseaux du plan sont des `/28` ; une adresse historique en `/24` ne doit pas être appliquée sur Site C.
+Site C est le Site 2 de la consigne professeur. Le bloc global validé est `172.16.64.0/18` avec le masque `255.255.192.0`. Le dépôt utilise un découpage de travail en `/24` par VLAN, à valider avant application.
 
 | Fichier | Cible | Contenu | État |
 | --- | --- | --- | --- |
-| [Switch L3.txt](../Switch%20L3.txt) | Switch L3 | VLAN 10, 20, 30, 40, 50, 60, 70, 80 et 99, SVI `/28`, ports d'accès, ACL et SSH | Exemple à adapter au modèle |
-| [Routeur2_Proxmox2.md](Routeur2_Proxmox2.md) | Routeur 2 et Proxmox 2 | Liaison au VLAN 30, réseau isolé des Web et reverse proxy | Adresses de transit proposées |
+| [Switch L3.txt](../Switch%20L3.txt) | Switch L3 | VLAN, noms, ports, SVI, relais DHCP, ACL et SSH | Configuration de travail à valider |
+| [Routeur 2.txt](../Routeur%202.txt) | Routeur 2 | Interfaces, routes, ACL d'isolation et SSH | Configuration de travail à valider |
+| [Routeur2_Proxmox2.md](Routeur2_Proxmox2.md) | Routeur 2 / Proxmox 2 | Plan d'adressage et règles de flux | Proposition à valider |
 
-## Adresses du plan
+## VLAN et passerelles de travail
 
-| VLAN | Réseau | Passerelle | Hôtes utilisables |
-| ---: | --- | --- | --- |
-| 10 | `192.168.0.0/28` | `192.168.0.1` | `.2` à `.14` |
-| 20 | `192.168.0.16/28` | `192.168.0.17` | `.18` à `.30` |
-| 30 | `192.168.0.32/28` | `192.168.0.33` | `.34` à `.46` |
-| 40 | `192.168.0.48/28` | `192.168.0.49` | `.50` à `.62` |
-| 50 | `192.168.0.64/28` | `192.168.0.65` | `.66` à `.78` |
-| 60 | `192.168.0.80/28` | `192.168.0.81` | `.82` à `.94` |
-| 70 | `192.168.0.96/28` | `192.168.0.97` | `.98` à `.110` |
-| 80 | `192.168.0.112/28` | `192.168.0.113` | `.114` à `.126` |
-| 99 | `192.168.0.128/28` | `192.168.0.129` | `.130` à `.142` |
+| VLAN | Réseau | Passerelle |
+| ---: | --- | --- |
+| 10 | `172.16.64.0/24` | `172.16.64.1` |
+| 20 | `172.16.65.0/24` | `172.16.65.1` |
+| 30 | `172.16.66.0/24` | `172.16.66.1` |
+| 40 | `172.16.67.0/24` | `172.16.67.1` |
+| 50 | `172.16.68.0/24` | `172.16.68.1` |
+| 60 | `172.16.69.0/24` | `172.16.69.1` |
+| 70 | `172.16.70.0/24` | `172.16.70.1` |
+| 80 | `172.16.71.0/24` | `172.16.71.1` |
+| 99 | `172.16.72.0/24` | `172.16.72.1` |
 
-## Répartition proposée des serveurs
-
-Les rôles ci-dessous utilisent des hôtes libres du VLAN 30 et doivent être confirmés avant installation :
+## Services de travail
 
 | Rôle | Adresse | Passerelle |
 | --- | --- | --- |
-| Windows Server AD/DNS/DHCP | `192.168.0.34/28` | `192.168.0.33` |
-| Zabbix | `192.168.0.35/28` | `192.168.0.33` |
-| Routeur 2 côté VLAN 30 | `192.168.0.46/28` | `192.168.0.33` |
-| Proxmox 2 côté réseau isolé | `192.168.200.2/24` | `192.168.200.1` |
-| Reverse proxy | `192.168.200.10/24` | `192.168.200.1` |
-| Web 1 | `192.168.200.11/24` | `192.168.200.1` |
-| Web 2 | `192.168.200.12/24` | `192.168.200.1` |
+| Windows AD/DNS/DHCP | `172.16.66.10/24` | `172.16.66.1` |
+| Zabbix | `172.16.66.11/24` | `172.16.66.1` |
+| IPBX | `172.16.66.12/24` | `172.16.66.1` |
+| Routeur 2 côté VLAN 30 | `172.16.66.254/24` | `172.16.66.1` |
+| Proxmox 2 | `172.16.74.2/24` | `172.16.74.1` |
+| Reverse proxy | `172.16.74.10/24` | `172.16.74.1` |
+| Web 1 / Web 2 | `172.16.74.11` / `.12` | `172.16.74.1` |
 
-Le transit proposé entre le switch et Routeur 1 est `192.168.254.0/30` : switch `.2`, routeur `.1`. Ces deux propositions évitent le conflit avec les sous-réseaux du nouveau plan.
+Transit proposé vers Routeur 1 : `172.16.73.0/30`, SW-L3 `172.16.73.2`, routeur `172.16.73.1`.
 
-## Avant application
-
-Relever le modèle et la version IOS, les noms d'interfaces, les ports réellement raccordés, l'adresse WAN de Routeur 1, les paramètres NAT, le domaine AD, les ports Web et la méthode de sauvegarde. Tester chaque ACL par un flux autorisé et un flux refusé avant `write memory`.
+Avant application, relever le modèle IOS, les ports, le WAN, le NAT, le domaine AD, les ports Web et le découpage validé par le professeur. Tester les ACL et sauvegarder les configurations seulement après recette.
