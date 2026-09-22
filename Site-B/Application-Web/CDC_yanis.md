@@ -32,7 +32,7 @@ Le document consolide :
 - les choix d’architecture et de sécurité formulés pour le présent projet ;
 - les informations réseau documentées dans le dossier Site-B/Infrastructure.
 
-Les photographies sont considérées comme des **documents d’entrée**. Les choix explicites du présent cahier des charges prévalent lorsqu’ils précisent ou adaptent les propositions pédagogiques visibles dans ces documents.
+Les choix explicites du présent cahier des charges prévalent lorsqu’ils précisent ou adaptent les propositions visibles dans ces documents.
 
 ## 2. Contexte et enjeux
 
@@ -96,7 +96,7 @@ Les enjeux principaux sont :
 
 ### 4.1 Inclus dans le périmètre
 
-- conception de l’architecture des deux portails ;
+- conception de l’architecture web des deux portails ;
 - maquettes des principaux écrans ;
 - développement du portail salarié ;
 - développement du portail d’administration ;
@@ -111,7 +111,7 @@ Les enjeux principaux sont :
 - documentation et procédures d’exploitation.
 
 ### 4.2 Hors périmètre initial
-
+b
 - remplacement complet de l’Active Directory ;
 - remplacement des outils spécialisés de supervision, de virtualisation, de sauvegarde ou de ticketing ;
 - administration directe et non contrôlée des pare-feu, switches, hyperviseurs ou serveurs depuis une page Web ;
