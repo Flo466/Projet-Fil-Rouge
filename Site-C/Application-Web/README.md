@@ -1,14 +1,13 @@
-# Application Web - Site C
+# Application Web
 
-Le reverse proxy est placé dans le VLAN 71 de la DMZ fournie `172.16.3.128/26`. Le VLAN 70 est réservé aux caméras. Les deux serveurs Web applicatifs restent dans le VLAN 30 du LAN.
+| Service | Hôte | Réseau / adresse | Passerelle |
+|---|---|---|---|
+| Web 1 | Proxmox 1 | VLAN 30 — 172.16.2.69/27 | 172.16.2.65 |
+| Web 2 | Proxmox 1 | VLAN 30 — 172.16.2.71/27 | 172.16.2.65 |
+| Reverse proxy | Proxmox 2 | DMZ — 172.16.3.162/27 | 172.16.3.161 (R2) |
 
-| VLAN | Rôle | Adresse | Passerelle |
-| ---: | --- | --- | --- |
-| 30 | Web 1 | `172.16.2.69/27` | `172.16.2.65` |
-| 30 | Web 2 | `172.16.2.71/27` | `172.16.2.65` |
-| 70 | Caméras DMZ | `172.16.3.130` à `172.16.3.158` (`/27`) | `172.16.3.129` |
-| 71 | Reverse proxy | `172.16.3.162/27` | `172.16.3.161` |
+Chemin : client → switch L3 → R2 → reverse proxy → R2 → Web 1 ou Web 2.
 
-Le reverse proxy `172.16.3.162` est la seule cible publiée en HTTP/HTTPS. Il relaie vers `172.16.2.69` et `172.16.2.71` dans le VLAN 30. Les caméras du VLAN 70 sont isolées et peuvent envoyer leur supervision vers Zabbix selon les ACL. Les VLAN 30, 70 et 71 sont transportés sur les trunks SW-L3 ↔ Routeur 2 et SW-L3 ↔ Proxmox 2.
+La VM proxy utilise uniquement le bridge DMZ de la deuxième carte de Proxmox 2. Les deux Web utilisent le bridge LAN de Proxmox 1. La gestion des trois nœuds Proxmox reste dans le VLAN 30.
 
-Les règles ACL autorisent les utilisateurs à joindre le reverse proxy, puis le reverse proxy à joindre les deux serveurs Web du VLAN 30. Les accès d'administration passent par le VLAN 99.
+Configurer les cibles du proxy sur .69 et .71 (HTTP/HTTPS selon l'application). La configuration applicative et les certificats restent à déployer. La HA des VM exige aussi stockage, quorum et disponibilité des réseaux : voir le [dossier réseau](../Infrastructure/docs/Dossier_reseau.md).

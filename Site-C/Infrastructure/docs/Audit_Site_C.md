@@ -1,44 +1,26 @@
-# Audit documentaire et préparation - Site C
+# Audit et recette — Site C
 
-## Périmètre
+**Audit documentaire uniquement : aucun équipement n'a été configuré ni testé à distance.**
 
-Cet audit vérifie que les fichiers de Site C utilisent le plan fourni par l'équipe et que les rôles du switch L3, de Routeur 2, de Proxmox 2 et de la DMZ sont compréhensibles. C'est un audit de configuration préparée : aucune connexion directe aux équipements n'a été faite depuis VS Code.
+Le plan cible respecte LAN 172.16.2.0/24 (7 /27 attribués et 1 /27 libre) et DMZ 172.16.3.128/26 (2 /27). Les passerelles LAN et caméras sont sur le switch ; la passerelle proxy .161 est uniquement sur R2. Trois nœuds Proxmox sont prévus en VLAN 30.
 
-## Plan contrôlé
+| Contrôle sur la maquette | Résultat attendu |
+|---|---|
+| show vlan brief / show ip interface brief sur SW | VLAN LAN + caméra ; aucune passerelle SVI 71 |
+| show ip route sur SW | 172.16.3.160/27 via 172.16.2.70 |
+| show ip interface brief / show ip route sur R2 | Gi0/0/1 .70, Gi0/0/0 .161 ; défaut via .65 |
+| Accès proxy depuis VLAN 10/20/40 | HTTP/HTTPS fonctionnels, réponses reçues |
+| Proxy vers Web 1 .69 et Web 2 .71 | HTTP/HTTPS autorisés |
+| Proxy vers autres services LAN / caméras | Nouvelles connexions refusées |
+| VLAN 99 vers SSH R2 et gestion Proxmox | Aller et retour fonctionnels |
+| VLAN 50 / DHCP des VLAN clients | VoIP conservée ; bail et DNS fonctionnels |
+| Caméras | Supervision selon protocole réel à confirmer ; refus des autres flux |
+| Serveur VLAN 30 vers client/admin/caméra : nouvelle connexion non prévue | Refusée ; retours DNS/DHCP/admin et Zabbix prévus à tester séparément |
+| Serveur VLAN 30 vers Internet | HTTP/HTTPS et NTP autorisés ; autres ports refusés ; DNS externe réservé à .66 |
+| Deux hôtes du VLAN 30 | Échanges locaux non filtrés par ACL_VLAN30 |
+| Proxmox 2 | Deux bridges distincts, aucune IP hôte sur la DMZ |
+| Cluster 3 nœuds | Quorum, stockage, watchdog et bascule à tester |
 
-| Zone | Réseau fourni | Découpage retenu |
-| --- | --- | --- |
-| LAN privé | `172.16.2.0/24` | 8 sous-réseaux `/27` pour les VLAN 10, 20, 30, 40, 50, 60, 80 et 99 |
-| DMZ | `172.16.3.128/26` | VLAN 70 en `172.16.3.128/27`, VLAN 71 en `172.16.3.160/27` |
+Avant déploiement : confirmer les ports 9–12, les noms des cartes Proxmox et les IP libres. Le transit R1 reprend ton extrait (192.168.0.2/30 vers .1). Le DNS de la VM proxy et ses mises à jour ne sont pas ouverts par les ACL actuelles : ajouter des exceptions précises lorsque leurs destinations seront connues. La publication Internet/NAT reste hors de cette modification.
 
-Le tableau complet avec les passerelles est dans [Dossier réseau](Dossier_reseau.md) et [Infrastructure/README.md](../README.md).
-
-## Contrôles préparés
-
-- Le VLAN 30 conserve la gestion de Proxmox 2, les serveurs internes et les deux serveurs Web `172.16.2.69` et `172.16.2.71`.
-- Les trunks SW-L3 ↔ Routeur 2 et SW-L3 ↔ Proxmox 2 sont préparés pour les VLAN 30, 70 et 71 ; leurs ports physiques restent à confirmer.
-- Routeur 2 porte `172.16.3.129` et `172.16.3.161`, les passerelles des deux sous-réseaux DMZ.
-- Le VLAN 70 contient les caméras DMZ et le VLAN 71 contient le reverse proxy `172.16.3.162`, qui relaie vers les deux serveurs Web du VLAN 30.
-- Le lien SW-L3 ↔ Routeur 1 (`Gi1/0/24`) est explicitement conservé sans changement.
-- Les ACL gardent les services nécessaires et limitent l'administration au VLAN 99.
-
-## Preuves à recueillir sur le matériel
-
-```text
-show version
-show inventory
-show interfaces status
-show vlan brief
-show interfaces trunk
-show ip interface brief
-show ip route
-show access-lists
-show mac address-table
-show arp
-```
-
-Tests à faire : ping des passerelles LAN et DMZ, renouvellement DHCP, résolution DNS, supervision des caméras vers Zabbix, accès Web via `172.16.3.162`, accès du reverse proxy vers `172.16.2.69` et `172.16.2.71`, SSH depuis le VLAN 99 et refus d'un accès DMZ vers les VLAN internes.
-
-## Résultat
-
-La structure du dépôt contient une configuration lisible et un plan d'adressage cohérent avec les réseaux fournis. La conformité « réellement déployée » ne pourra être déclarée qu'après comparaison avec les sorties ci-dessus et validation du câblage réel.
+Conserver les sorties show access-lists et les résultats positifs/négatifs, puis sauvegarder. Aucun résultat de HA ou de déploiement n'est présumé acquis.

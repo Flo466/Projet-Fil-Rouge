@@ -1,49 +1,53 @@
-# Infrastructure - Site C
+# Plan d'adressage — Site C
 
-Ce dossier contient le plan d'adressage retenu et les deux configurations à expliquer à l'oral : le switch L3 et Routeur 2. Le lien existant entre le switch L3 et Routeur 1 est conservé tel quel.
+**LAN : 172.16.2.0/24**, découpé en 8 /27 : 7 attribués et 1 bloc IP libre. **DMZ : 172.16.3.128/26**, divisée en 2 /27. Tous les sous-réseaux utilisent le masque **255.255.255.224** (30 hôtes, passerelle comprise).
 
-## Réseaux
+| VLAN / zone | Usage | Sous-réseau | Passerelle | Hôtes utilisables | Broadcast |
+|---|---|---|---|---|---|
+| 10 | Service 1 | 172.16.2.0/27 | 172.16.2.1 (SW) | .1 à .30 | .31 |
+| 20 | Service 2 | 172.16.2.32/27 | 172.16.2.33 (SW) | .33 à .62 | .63 |
+| 30 | Serveurs / 3 Proxmox | 172.16.2.64/27 | 172.16.2.65 (SW) | .65 à .94 | .95 |
+| 40 | Wi-Fi employés | 172.16.2.96/27 | 172.16.2.97 (SW) | .97 à .126 | .127 |
+| 50 | VoIP | 172.16.2.128/27 | 172.16.2.129 (SW) | .129 à .158 | .159 |
+| 60 | Wi-Fi invités | 172.16.2.160/27 | 172.16.2.161 (SW) | .161 à .190 | .191 |
+| Non attribué | Réserve IP sans VLAN | 172.16.2.192/27 | Aucune | .193 à .222 | .223 |
+| 99 | Management | 172.16.2.224/27 | 172.16.2.225 (SW) | .225 à .254 | .255 |
+| 70 | Caméras DMZ | 172.16.3.128/27 | 172.16.3.129 (SW) | .129 à .158 | .159 |
+| Zone 71 | Reverse proxy DMZ | 172.16.3.160/27 | 172.16.3.161 (R2) | .161 à .190 | .191 |
 
-### LAN privé : `172.16.2.0/24`
+La zone 71 est le nom logique de la DMZ proxy. Avec le câble dédié R2 → Proxmox 2, elle circule **sans tag 802.1Q** : aucune SVI 71 sur le switch et aucune sous-interface sur R2.
 
-Le LAN est découpé en huit sous-réseaux `/27` (`255.255.255.224`). La passerelle est la première adresse utilisable de chaque bloc.
+## Comment le découpage a été fait
 
-| VLAN | Usage | Réseau | Passerelle | Hôtes |
-| ---: | --- | --- | --- | --- |
-| 10 | Service 1 | `172.16.2.0/27` | `172.16.2.1` | `.2` à `.30` |
-| 20 | Service 2 | `172.16.2.32/27` | `172.16.2.33` | `.34` à `.62` |
-| 30 | Serveurs / Proxmox 2 / Web | `172.16.2.64/27` | `172.16.2.65` | `.66` à `.94` |
-| 40 | Wi-Fi employés | `172.16.2.96/27` | `172.16.2.97` | `.98` à `.126` |
-| 50 | VoIP | `172.16.2.128/27` | `172.16.2.129` | `.130` à `.158` |
-| 60 | Wi-Fi invités | `172.16.2.160/27` | `172.16.2.161` | `.162` à `.190` |
-| 80 | Réserve / extension | `172.16.2.192/27` | `172.16.2.193` | `.194` à `.222` |
-| 99 | Management | `172.16.2.224/27` | `172.16.2.225` | `.226` à `.254` |
+- **LAN /24 vers /27** : on emprunte 3 bits à la partie hôte. Cela donne `2³ = 8` sous-réseaux égaux.
+- **DMZ /26 vers /27** : on emprunte 1 bit. Cela donne `2¹ = 2` sous-réseaux égaux.
+- Un `/27` contient `2⁵ = 32` adresses, soit **30 adresses utilisables** après retrait de l'adresse réseau et du broadcast. Son masque est `255.255.255.224`.
+- Le pas est de **32** : le LAN commence à `.0`, `.32`, `.64`, `.96`, `.128`, `.160`, `.192` et `.224`. La DMZ commence à `172.16.3.128` et `172.16.3.160`.
+- Exemple VLAN 30 : réseau `172.16.2.64/27`, hôtes `.65` à `.94`, broadcast `.95`. La première adresse utilisable `.65` sert de passerelle ; il reste 29 adresses pour les équipements.
 
-Adresses de travail du VLAN 30 : AD/DNS/DHCP `172.16.2.66`, Zabbix `172.16.2.67`, Proxmox 2 `172.16.2.68`, Web 1 `172.16.2.69`, Routeur 2 côté LAN `172.16.2.70`, Web 2 `172.16.2.71`.
+## Réserve IP
 
-### DMZ : `172.16.3.128/26`
+Le bloc **172.16.2.192/27** reste libre pour une évolution : **172.16.2.193 à 172.16.2.222**, soit 30 adresses utilisables. `.192` est l'adresse réseau et `.223` le broadcast. Aucun VLAN, aucune SVI, aucune passerelle et aucun pool DHCP ne lui sont affectés. Les autres VLAN gardent leurs adresses actuelles.
 
-La DMZ est découpée en deux sous-réseaux `/27` (`255.255.255.224`) :
+## Adresses fixes prévues
 
-| VLAN | Rôle | Réseau | Passerelle | Hôtes proposés |
-| ---: | --- | --- | --- | --- |
-| 70 | Caméras DMZ | `172.16.3.128/27` | `172.16.3.129` | Caméras `.130` à `.158` |
-| 71 | DMZ reverse proxy | `172.16.3.160/27` | `172.16.3.161` | Reverse proxy `.162` |
+| Équipement / service | Adresse /27 | Passerelle |
+|---|---|---|
+| AD / DNS / DHCP | 172.16.2.66 | 172.16.2.65 |
+| Zabbix | 172.16.2.67 | 172.16.2.65 |
+| Proxmox 2 — gestion | 172.16.2.68 | 172.16.2.65 |
+| Web 1 sur Proxmox 1 | 172.16.2.69 | 172.16.2.65 |
+| R2 — Gi0/0/1 côté LAN | 172.16.2.70 | route par défaut vers 172.16.2.65 |
+| Web 2 sur Proxmox 1 | 172.16.2.71 | 172.16.2.65 |
+| Proxmox 1 — gestion | 172.16.2.72 | 172.16.2.65 |
+| Proxmox 3 — gestion | 172.16.2.73 | 172.16.2.65 |
+| IPBX (prévu) | 172.16.2.130 | 172.16.2.129 |
+| Caméras | 172.16.3.130 à .158 | 172.16.3.129 |
+| R2 — Gi0/0/0 côté DMZ | 172.16.3.161 | — |
+| Reverse proxy sur Proxmox 2 | 172.16.3.162 | 172.16.3.161 |
 
-## Liens
+Exclure ces adresses fixes des baux DHCP. Les adresses .72/.73 des nouveaux nœuds sont des affectations proposées à vérifier avant déploiement.
 
-- SW-L3 ↔ Routeur 1 : lien existant conservé tel quel, aucune adresse ni route modifiée.
-- SW-L3 ↔ Routeur 2 `Gi0/0` : trunk 802.1Q, port du switch **à confirmer**, VLAN autorisés 30, 70 et 71.
-- SW-L3 ↔ Proxmox 2 : trunk 802.1Q, port du switch **à confirmer**, VLAN autorisés 30, 70 et 71 ; VLAN 30 natif pour la gestion de Proxmox.
-- Les ports connus `Gi1/0/22` (Wi-Fi invités) et `Gi1/0/23` (caméras) restent en accès comme dans l'extrait fourni.
-- Le VLAN 70 contient les caméras de la DMZ ; le VLAN 71 contient le reverse proxy.
-- Les deux serveurs Web applicatifs restent dans le VLAN 30.
+Le lien Routeur 1 conserve les valeurs de ton extrait : SW Gi1/0/24 = 192.168.0.2/30, prochain saut 192.168.0.1. Ce transit existant reste hors du nouveau découpage LAN/DMZ.
 
-## Fichiers
-
-- [Switch-L3.txt](configuration/Switch-L3.txt) : VLAN, ports, SVI, ACL, relais DHCP et SSH.
-- [Routeur-2.txt](configuration/Routeur-2.txt) : sous-interfaces trunk, routes, ACL DMZ et SSH.
-- [Dossier réseau](docs/Dossier_reseau.md) : explication de l'architecture et de la recette.
-- [Audit Site C](docs/Audit_Site_C.md) : contrôle documentaire et preuves à recueillir.
-
-Le découpage est construit à partir des réseaux fournis par l'équipe. Les noms des interfaces et les ports doivent être vérifiés sur le matériel avant collage de configuration.
+[Câblage et fonctionnement](docs/Dossier_reseau.md) · [Audit](docs/Audit_Site_C.md)

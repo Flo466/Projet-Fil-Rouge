@@ -1,50 +1,51 @@
-# Dossier réseau - Site C
+# Câblage et fonctionnement
 
-## 1. Plan d'adressage
+## Ports du switch
 
-Le LAN privé fourni est `172.16.2.0/24` (`255.255.255.0`). Il est découpé en huit sous-réseaux `/27` (`255.255.255.224`) :
+| Ports | Affectation |
+|---|---|
+| Gi1/0/1–4 | Access VLAN 10 |
+| Gi1/0/5–8 | Access VLAN 20 |
+| Gi1/0/9–12 | Access VLAN 30 : Proxmox 1, 2, 3 et Routeur 2, ordre **à confirmer** |
+| Gi1/0/13–16 | Access VLAN 40 |
+| Gi1/0/17–20 | Access VLAN 50 VoIP |
+| Gi1/0/21 | Access VLAN 99 |
+| Gi1/0/22 | Access VLAN 60 |
+| Gi1/0/23 | Access VLAN 70 caméras |
+| Gi1/0/24 | Lien Routeur 1 conservé |
 
-| VLAN | Usage | Réseau / plage complète | Passerelle |
-| ---: | --- | --- | --- |
-| 10 | Service 1 | `172.16.2.0/27` (`.0` à `.31`) | `172.16.2.1` |
-| 20 | Service 2 | `172.16.2.32/27` (`.32` à `.63`) | `172.16.2.33` |
-| 30 | Serveurs / Proxmox 2 / Web | `172.16.2.64/27` (`.64` à `.95`) | `172.16.2.65` |
-| 40 | Wi-Fi employés | `172.16.2.96/27` (`.96` à `.127`) | `172.16.2.97` |
-| 50 | VoIP | `172.16.2.128/27` (`.128` à `.159`) | `172.16.2.129` |
-| 60 | Wi-Fi invités | `172.16.2.160/27` (`.160` à `.191`) | `172.16.2.161` |
-| 80 | Réserve | `172.16.2.192/27` (`.192` à `.223`) | `172.16.2.193` |
-| 99 | Management | `172.16.2.224/27` (`.224` à `.255`) | `172.16.2.225` |
+Routeur 2 **Gi0/0/1** rejoint un port VLAN 30 du switch. **Gi0/0/0** rejoint directement la deuxième carte de Proxmox 2. Tous ces câbles sont non tagués, sans trunk.
 
-La DMZ fournie est `172.16.3.128/26` (`255.255.255.192`, de `.128` à `.191`). Elle est divisée en deux `/27` :
+## Proxmox et haute disponibilité
 
-| VLAN | Usage | Réseau / plage complète | Passerelle |
-| ---: | --- | --- | --- |
-| 70 | Caméras DMZ | `172.16.3.128/27` (`.128` à `.159`) | `172.16.3.129` |
-| 71 | DMZ reverse proxy | `172.16.3.160/27` (`.160` à `.191`) | `172.16.3.161` |
+Trois nœuds sont prévus sur le VLAN 30 : Proxmox 1 (.72), Proxmox 2 (.68) et Proxmox 3 (.73). Proxmox 1 héberge initialement Web 1 (.69) et Web 2 (.71).
 
-Adresses prévues : AD/DNS/DHCP `172.16.2.66`, Zabbix `172.16.2.67`, Proxmox 2 `172.16.2.68`, Web 1 `172.16.2.69`, Routeur 2 sur le VLAN 30 `172.16.2.70`, Web 2 `172.16.2.71`, reverse proxy `172.16.3.162`. Les caméras utilisent les adresses disponibles du VLAN 70.
+Sur Proxmox 2 :
+- Carte 1 → bridge LAN (ex. vmbr0), gestion 172.16.2.68/27 et unique passerelle hôte 172.16.2.65.
+- Carte 2 → bridge DMZ (ex. vmbr1), **sans IP ni passerelle sur l'hôte**.
+- VM reverse proxy → bridge DMZ uniquement, sans tag VLAN, 172.16.3.162/27 et passerelle 172.16.3.161.
+- Ne pas réunir les deux cartes dans le même bridge et ne pas activer de routage LAN/DMZ sur l'hôte.
 
-## 2. Liens et ports
+Trois nœuds permettent de prévoir le quorum du cluster ; la HA demande aussi stockage partagé ou réplication adaptée, watchdog et tests de bascule. Le reverse proxy reste dépendant du câble DMZ de Proxmox 2 : **pas de HA automatique du proxy** tant que les autres nœuds n'ont pas accès au même réseau DMZ isolé. Un cluster à trois nœuds n'apporte pas cette connectivité à lui seul.
 
-| Lien | Mode | VLAN autorisés | Rôle |
-| --- | --- | --- | --- |
-| SW-L3 port à confirmer ↔ R2 Gi0/0 | trunk 802.1Q | 30, 70, 71 | Routeur 2 porte les passerelles DMZ |
-| SW-L3 port à confirmer ↔ Proxmox 2 | trunk 802.1Q | 30, 70, 71 | Gestion Proxmox en VLAN 30, VM dans les DMZ |
-| SW-L3 Gi1/0/24 ↔ Routeur 1 | routé L3 | inchangé | Lien existant à ne pas modifier |
+## Routes et filtrage
 
-Les ports Gi1/0/1-4, 5-8, 9-12, 13-16 et 17-20 sont respectivement en accès dans les VLAN 10, 20, 30, 40 et 50. Gi1/0/21 est le poste d'administration du VLAN 99, Gi1/0/22 le Wi-Fi invités et Gi1/0/23 les caméras. Les ports des trunks Routeur 2 et Proxmox 2 restent à confirmer.
+- Switch : route 172.16.3.160/27 via 172.16.2.70 ; caméras directement sur SVI 70.
+- R2 : route par défaut vers 172.16.2.65 ; DMZ directement connectée sur Gi0/0/0.
+- Utilisateurs → proxy → Web 1/Web 2 : HTTP/HTTPS.
+- Caméras : DNS et supervision prévue vers Zabbix ; administration depuis VLAN 99.
+- Les retours du proxy traversant le SVI 30 sont autorisés explicitement. Aucun NAT entre LAN et DMZ.
+- Les échanges entre hôtes du VLAN 30 restent en niveau 2 : ils ne passent pas par les ACL des SVI. Filtrer sur les hôtes si nécessaire.
+- Les ACL TCP « established » vérifient les bits ACK/RST ; elles ne remplacent pas un pare-feu avec suivi de connexions.
 
-## 3. Routage et filtrage
+## Filtrage du VLAN 30
 
-Le switch L3 est la passerelle des huit VLAN LAN. Routeur 2 est la passerelle des VLAN DMZ et utilise `172.16.2.65` comme sortie vers le LAN. Le switch route `172.16.3.128/27` et `172.16.3.160/27` vers `172.16.2.70`. Le lien vers Routeur 1 et sa route par défaut restent tels qu'ils étaient.
+Le VLAN serveurs ne dispose plus d'une autorisation générale vers toutes les destinations. Son ACL en entrée autorise les réponses DNS/DHCP de .66, les retours TCP et ping vers les administrateurs, les réponses Zabbix aux caméras et les retours du proxy via R2. Les autres flux vers les réseaux privés sont bloqués. Vers les destinations externes, seuls HTTP/HTTPS et NTP sont ouverts aux serveurs ; seul .66 peut effectuer des requêtes DNS externes. Tout le reste est refusé.
 
-Les ACL du switch autorisent DNS, DHCP et les services nécessaires, puis bloquent les accès inter-réseaux non prévus. Les ACL de Routeur 2 autorisent HTTP/HTTPS vers le reverse proxy `172.16.3.162`, puis du reverse proxy vers Web 1 `172.16.2.69` et Web 2 `172.16.2.71`. Les caméras sont limitées à leur supervision et les nouvelles connexions de la DMZ vers le LAN sont refusées par défaut.
+Ces sorties sont limitées par port, pas par serveur externe : fixer les résolveurs, dépôts et serveurs NTP permettra de restreindre aussi les destinations. Les autorisations de retour UDP reposent sur les IP/ports, et `established` sur ACK/RST : aucun suivi de session. L'ACL ne filtre ni les communications internes au VLAN 30, ni les réponses Internet entrant par R1. AD au-delà de DNS/DHCP, supervision par interrogation et nouveaux services nécessiteront leurs propres flux validés ; ils ne sont pas ouverts implicitement.
 
-## 4. Recette
+## Application
 
-1. Vérifier `show vlan brief`, `show interfaces trunk` et `show ip interface brief`.
-2. Vérifier les routes et le ping entre `172.16.2.65`, `172.16.2.70`, `172.16.3.129` et `172.16.3.161`.
-3. Tester DHCP/DNS depuis les VLAN 10, 20 et 40.
-4. Tester HTTP/HTTPS via `172.16.3.162`, puis vérifier que le proxy atteint `172.16.2.69` et `172.16.2.71`.
-5. Tester SSH depuis le VLAN 99 et le refus depuis un autre VLAN.
-6. Contrôler les compteurs avec `show access-lists` et sauvegarder après validation.
+Les fichiers décrivent l'état cible. Avant application, sauvegarder les configurations et remplacer A_REMPLACER. Remplacer entièrement ACL_VLAN30 (notamment son ancien `permit ip 172.16.2.64 0.0.0.31 any`) lors d’une fenêtre de maintenance ; ajouter les nouvelles lignes après cette permission ne suffit pas. Retirer les anciennes ACL ou sous-interfaces incompatibles ; ne pas cumuler les versions. Si une ancienne SVI 71 existe sur le switch, la supprimer pour que seule R2 porte 172.16.3.161. Vérifier le lien R1 avec l'équipe.
+
+[Plan complet](../README.md) · [Tests](Audit_Site_C.md)
