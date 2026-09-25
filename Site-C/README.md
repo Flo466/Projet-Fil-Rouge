@@ -1,37 +1,33 @@
-# Site C / Site 3
+# Site C
 
-Documentation du réseau, des services et de l'audit de Site C.
+Ce dossier regroupe la configuration réseau et l'application Web du Site C. Le plan demandé est maintenant appliqué dans tous les documents : LAN privé `172.16.2.0/24` découpé en huit `/27`, et DMZ `172.16.3.128/26` découpée en deux `/27`.
 
-La nouvelle consigne professeur attribue à notre site le bloc global `172.16.128.0/18` (`255.255.192.0`). Pour conserver les VLAN, les passerelles et les ACL déjà préparés, les fichiers utilisent un découpage de travail en `/24` par VLAN. Ce découpage doit être validé avant mise en production.
+Le serveur Proxmox 2 et les deux serveurs Web restent dans le VLAN 30. Les caméras sont dans le VLAN 70 et le reverse proxy dans le VLAN 71 de la DMZ. Les VLAN 30, 70 et 71 passent sur les trunks vers Routeur 2 et Proxmox 2. Le lien existant entre le switch L3 et Routeur 1 est conservé sans modification.
 
-## Documents
+## Plan d'adressage
 
-| Document | Contenu |
+| VLAN | Usage | Sous-réseau | Passerelle |
+| ---: | --- | --- | --- |
+| 10 | Service 1 | `172.16.2.0/27` | `172.16.2.1` |
+| 20 | Service 2 | `172.16.2.32/27` | `172.16.2.33` |
+| 30 | Serveurs / Proxmox 2 / Web | `172.16.2.64/27` | `172.16.2.65` |
+| 40 | Wi-Fi employés | `172.16.2.96/27` | `172.16.2.97` |
+| 50 | VoIP | `172.16.2.128/27` | `172.16.2.129` |
+| 60 | Wi-Fi invités | `172.16.2.160/27` | `172.16.2.161` |
+| 80 | Réserve | `172.16.2.192/27` | `172.16.2.193` |
+| 99 | Management | `172.16.2.224/27` | `172.16.2.225` |
+| 70 | Caméras DMZ | `172.16.3.128/27` | `172.16.3.129` |
+| 71 | DMZ reverse proxy | `172.16.3.160/27` | `172.16.3.161` |
+
+## Documents à expliquer
+
+| Document | Rôle |
 | --- | --- |
-| [Plan d'adressage](Infrastructure/Plan_adressage_Site_C.md) | Bloc `/18`, VLAN, passerelles et sous-réseaux de travail |
-| [Audit Site C](Infrastructure/docs/Audit_Site_C.md) | Écarts connus, preuves disponibles et plan de contrôle |
-| [Planning Sprint 3](Infrastructure/Planning_Site_A_sprint3_routeur2.pdf) | Services, Routeur 2, Proxmox 2 et reverse proxy |
-| [Dossier réseau](Infrastructure/docs/Dossier_reseau.md) | Architecture, services, routage et filtrage |
-| [Guide de configuration](Infrastructure/docs/Configuration_Reseau_Commandes.md) | Commandes de vérification et de mise en service |
-| [Inventaire des configurations](Infrastructure/configuration/README.md) | Fichiers à préparer, appliquer et sauvegarder |
-| [Configuration Switch L3](Infrastructure/Switch%20L3.txt) | VLAN, noms, ports, SVI, ACL, relais DHCP et SSH |
-| [Configuration Routeur 2](Infrastructure/Routeur%202.txt) | Interfaces, routes, ACL d'isolation et SSH |
+| [Infrastructure/README.md](Infrastructure/README.md) | Plan d'adressage, rôles et liens |
+| [Switch-L3.txt](Infrastructure/configuration/Switch-L3.txt) | VLAN, ports, passerelles LAN, ACL, SSH et routes DMZ |
+| [Routeur-2.txt](Infrastructure/configuration/Routeur-2.txt) | Trunk, passerelles DMZ, routage, ACL et SSH |
+| [Dossier réseau](Infrastructure/docs/Dossier_reseau.md) | Architecture et procédure de recette |
+| [Audit Site C](Infrastructure/docs/Audit_Site_C.md) | Contrôles et preuves à recueillir |
+| [Application-Web/README.md](Application-Web/README.md) | Adresses du reverse proxy et des serveurs Web |
 
-## Découpage de travail
-
-```text
-Site 3 : 172.16.128.0/18
-  VLAN 10 : 172.16.128.0/24  GW .1
-  VLAN 20 : 172.16.129.0/24  GW .1
-  VLAN 30 : 172.16.130.0/24  GW .1
-  VLAN 40 : 172.16.131.0/24  GW .1
-  VLAN 50 : 172.16.132.0/24  GW .1
-  VLAN 60 : 172.16.133.0/24  GW .1
-  VLAN 70 : 172.16.134.0/24  GW .1
-  VLAN 80 : 172.16.135.0/24  GW .1
-  VLAN 99 : 172.16.136.0/24  GW .1
-  Transit R1 : 172.16.137.0/30
-  DMZ/Proxmox 2 : 172.16.138.0/24
-```
-
-Les adresses et le masque `/18` de la photo sont la référence. Le détail `/24` ci-dessus est une proposition de travail, pas une validation du professeur. L'ancien `nouveau adressage.pdf` est conservé comme historique et ne doit plus être appliqué.
+Les fichiers sont des configurations de préparation : il faut vérifier les numéros de ports, le modèle IOS et les adresses réellement utilisées avant collage sur le matériel.

@@ -1,0 +1,239 @@
+! SITE C - SWITCH L3
+! LAN 172.16.2.0/24 -> huit sous-reseaux /27
+! DMZ 172.16.3.128/26 -> VLAN 70 et 71
+
+enable
+configure terminal
+hostname SW-L3-C
+no ip domain-lookup
+ip routing
+
+! 1. VLAN
+vlan 10
+ name SERVICE1
+vlan 20
+ name SERVICE2
+vlan 30
+ name SERVEURS_PROXMOX2_WEB
+vlan 40
+ name WIFI_EMPLOYES
+vlan 50
+ name VOIP
+vlan 60
+ name WIFI_INVITES
+vlan 70
+ name CAMERAS_DMZ
+vlan 71
+ name DMZ_REVERSE_PROXY
+vlan 80
+ name RESERVE
+vlan 99
+ name MANAGEMENT
+exit
+
+! 2. Passerelles LAN (/27)
+interface Vlan10
+ description GW_SERVICE1
+ ip address 172.16.2.1 255.255.255.224
+ ip helper-address 172.16.2.66
+ no shutdown
+interface Vlan20
+ description GW_SERVICE2
+ ip address 172.16.2.33 255.255.255.224
+ ip helper-address 172.16.2.66
+ no shutdown
+interface Vlan30
+ description GW_SERVEURS_PROXMOX2_WEB
+ ip address 172.16.2.65 255.255.255.224
+ no shutdown
+interface Vlan40
+ description GW_WIFI_EMPLOYES
+ ip address 172.16.2.97 255.255.255.224
+ ip helper-address 172.16.2.66
+ no shutdown
+interface Vlan50
+ description GW_VOIP
+ ip address 172.16.2.129 255.255.255.224
+ ip helper-address 172.16.2.66
+ no shutdown
+interface Vlan60
+ description GW_WIFI_INVITES
+ ip address 172.16.2.161 255.255.255.224
+ ip helper-address 172.16.2.66
+ no shutdown
+interface Vlan80
+ description GW_RESERVE
+ ip address 172.16.2.193 255.255.255.224
+ no shutdown
+interface Vlan99
+ description GW_MANAGEMENT
+ ip address 172.16.2.225 255.255.255.224
+ no shutdown
+
+! Les passerelles des DMZ sont sur Routeur 2.
+! Le switch ne met donc pas d'adresse IP sur les SVI 70 et 71.
+
+! 3. Ports utilisateurs
+interface range GigabitEthernet1/0/1 - 4
+ description ACCES_SERVICE1
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+interface range GigabitEthernet1/0/5 - 8
+ description ACCES_SERVICE2
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ no shutdown
+interface range GigabitEthernet1/0/9 - 12
+ description ACCES_SERVEURS_PROXMOX2_WEB
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+ no shutdown
+interface range GigabitEthernet1/0/13 - 16
+ description ACCES_WIFI_EMPLOYES
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+ no shutdown
+interface range GigabitEthernet1/0/17 - 20
+ description ACCES_VOIP
+ switchport mode access
+ switchport access vlan 50
+ spanning-tree portfast
+ no shutdown
+interface GigabitEthernet1/0/21
+ description POSTE_ADMINISTRATION
+ switchport mode access
+ switchport access vlan 99
+ spanning-tree portfast
+ no shutdown
+
+! 4. Trunks : seuls les VLAN utiles sont transportes.
+interface GigabitEthernet1/0/22
+ description TRUNK_ROUTEUR2
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk native vlan 30
+ switchport trunk allowed vlan 30,70,71
+ switchport nonegotiate
+ no shutdown
+interface GigabitEthernet1/0/23
+ description TRUNK_PROXMOX2
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk native vlan 30
+ switchport trunk allowed vlan 30,70,71
+ switchport nonegotiate
+ no shutdown
+
+! 5. LIEN ROUTEUR 1 : ne pas modifier.
+interface GigabitEthernet1/0/24
+ description TRANSIT_ROUTEUR1_EXISTANT_NE_PAS_MODIFIER
+ no switchport
+ ip address 172.16.137.2 255.255.255.252
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 172.16.137.1
+
+! Routes vers les deux DMZ via Routeur 2 (VLAN 30).
+ip route 172.16.3.128 255.255.255.224 172.16.2.70
+ip route 172.16.3.160 255.255.255.224 172.16.2.70
+
+! 6. SSH limite au VLAN 99.
+ip domain name site-c.local
+username admin privilege 15 secret A_REMPLACER
+crypto key generate rsa modulus 2048
+ip ssh version 2
+ip access-list standard SSH_VLAN99_ONLY
+ permit 172.16.2.224 0.0.0.31
+ deny any log
+exit
+line vty 0 15
+ login local
+ transport input ssh
+ access-class SSH_VLAN99_ONLY in
+ exec-timeout 10 0
+exit
+
+! 7. ACL simples par usage.
+! Utilisateurs : services internes necessaires, Web via reverse proxy, puis Internet.
+ip access-list extended ACL_USERS
+ permit udp any host 172.16.2.66 eq 67
+ permit udp any host 172.16.2.66 eq 53
+ permit tcp any host 172.16.2.66 eq 53
+ permit tcp any host 172.16.2.66 eq 88
+ permit tcp any host 172.16.2.66 eq 389
+ permit tcp any host 172.16.2.66 eq 445
+ permit tcp any host 172.16.3.162 eq 80
+ permit tcp any host 172.16.3.162 eq 443
+ deny ip any 172.16.2.0 0.0.0.255 log
+ deny ip any 172.16.3.128 0.0.0.63 log
+ permit ip any any
+exit
+
+! Serveurs et Proxmox 2 : acces necessaire aux reseaux du projet.
+ip access-list extended ACL_SERVERS
+ permit ip any any
+exit
+
+! VoIP : DNS/DHCP et IPBX uniquement dans le LAN, puis sortie generale.
+ip access-list extended ACL_VOIP
+ permit udp any host 172.16.2.66 eq 67
+ permit udp any host 172.16.2.66 eq 53
+ permit ip any host 172.16.2.130
+ deny ip any 172.16.2.0 0.0.0.255 log
+ deny ip any 172.16.3.128 0.0.0.63 log
+ permit ip any any
+exit
+
+! Invites : DNS/DHCP et Internet, aucun reseau prive.
+ip access-list extended ACL_GUESTS
+ permit udp any host 172.16.2.66 eq 67
+ permit udp any any eq 53
+ permit tcp any any eq 53
+ deny ip any 172.16.2.0 0.0.0.255 log
+ deny ip any 172.16.3.128 0.0.0.63 log
+ permit ip any any
+exit
+
+! Reserve : aucun flux tant que son usage n'est pas valide.
+ip access-list extended ACL_RESERVE
+ deny ip any any log
+exit
+
+! Management : administration et diagnostic.
+ip access-list extended ACL_MANAGEMENT
+ permit ip any any
+exit
+
+! Application des ACL apres leur declaration.
+interface Vlan10
+ ip access-group ACL_USERS in
+interface Vlan20
+ ip access-group ACL_USERS in
+interface Vlan30
+ ip access-group ACL_SERVERS in
+interface Vlan40
+ ip access-group ACL_USERS in
+interface Vlan50
+ ip access-group ACL_VOIP in
+interface Vlan60
+ ip access-group ACL_GUESTS in
+interface Vlan80
+ ip access-group ACL_RESERVE in
+interface Vlan99
+ ip access-group ACL_MANAGEMENT in
+
+end
+write memory
+
+! Verification :
+! show vlan brief
+! show interfaces trunk
+! show ip interface brief
+! show ip route
+! show access-lists
+! ping 172.16.2.70

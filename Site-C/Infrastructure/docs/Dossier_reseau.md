@@ -1,77 +1,50 @@
-# Dossier réseau - Site C / Site 3
+# Dossier réseau - Site C
 
-## 1. Référence d'adressage
+## 1. Plan d'adressage
 
-La consigne professeur attribue à notre site le bloc `172.16.128.0/18` avec le masque `255.255.192.0`. La plage globale va de `172.16.128.0` à `172.16.191.255`.
+Le LAN privé fourni est `172.16.2.0/24` (`255.255.255.0`). Il est découpé en huit sous-réseaux `/27` (`255.255.255.224`) :
 
-La consigne ne fournit pas le découpage interne. Pour garder les VLAN et les ACL exploitables, ce dépôt utilise un découpage de travail en `/24`, documenté dans [Plan_adressage_Site_C.md](../Plan_adressage_Site_C.md). Ce choix doit être validé avant tout déploiement réel.
-
-## 2. VLAN, passerelles et rôles
-
-| VLAN | Usage | Réseau de travail | Passerelle |
+| VLAN | Usage | Réseau / plage complète | Passerelle |
 | ---: | --- | --- | --- |
-| 10 | Service 1 | `172.16.128.0/24` | `172.16.128.1` |
-| 20 | Service 2 | `172.16.129.0/24` | `172.16.129.1` |
-| 30 | Serveurs | `172.16.130.0/24` | `172.16.130.1` |
-| 40 | Wi-Fi employés | `172.16.131.0/24` | `172.16.131.1` |
-| 50 | VoIP | `172.16.132.0/24` | `172.16.132.1` |
-| 60 | Wi-Fi invités | `172.16.133.0/24` | `172.16.133.1` |
-| 70 | Caméras IP | `172.16.134.0/24` | `172.16.134.1` |
-| 80 | Réserve | `172.16.135.0/24` | `172.16.135.1` |
-| 99 | Management | `172.16.136.0/24` | `172.16.136.1` |
+| 10 | Service 1 | `172.16.2.0/27` (`.0` à `.31`) | `172.16.2.1` |
+| 20 | Service 2 | `172.16.2.32/27` (`.32` à `.63`) | `172.16.2.33` |
+| 30 | Serveurs / Proxmox 2 / Web | `172.16.2.64/27` (`.64` à `.95`) | `172.16.2.65` |
+| 40 | Wi-Fi employés | `172.16.2.96/27` (`.96` à `.127`) | `172.16.2.97` |
+| 50 | VoIP | `172.16.2.128/27` (`.128` à `.159`) | `172.16.2.129` |
+| 60 | Wi-Fi invités | `172.16.2.160/27` (`.160` à `.191`) | `172.16.2.161` |
+| 80 | Réserve | `172.16.2.192/27` (`.192` à `.223`) | `172.16.2.193` |
+| 99 | Management | `172.16.2.224/27` (`.224` à `.255`) | `172.16.2.225` |
 
-| Rôle | Adresse de travail | Passerelle |
-| --- | --- | --- |
-| Windows AD/DNS/DHCP | `172.16.130.10/24` | `172.16.130.1` |
-| Zabbix | `172.16.130.11/24` | `172.16.130.1` |
-| IPBX | `172.16.130.12/24` | `172.16.130.1` |
-| Routeur 2 vers VLAN 30 | `172.16.130.254/24` | `172.16.130.1` |
-| Proxmox 2 | `172.16.138.2/24` | `172.16.138.1` |
-| Reverse proxy | `172.16.138.10/24` | `172.16.138.1` |
-| Web 1 / Web 2 | `172.16.138.11` / `.12` | `172.16.138.1` |
+La DMZ fournie est `172.16.3.128/26` (`255.255.255.192`, de `.128` à `.191`). Elle est divisée en deux `/27` :
 
-Le transit vers Routeur 1 est proposé en `172.16.137.0/30` : SW-L3 `.2`, routeur `.1`. Le réseau applicatif de Routeur 2 est `172.16.138.0/24` dans le découpage de travail.
+| VLAN | Usage | Réseau / plage complète | Passerelle |
+| ---: | --- | --- | --- |
+| 70 | Caméras DMZ | `172.16.3.128/27` (`.128` à `.159`) | `172.16.3.129` |
+| 71 | DMZ reverse proxy | `172.16.3.160/27` (`.160` à `.191`) | `172.16.3.161` |
 
-## 3. Ports et VLAN
+Adresses prévues : AD/DNS/DHCP `172.16.2.66`, Zabbix `172.16.2.67`, Proxmox 2 `172.16.2.68`, Web 1 `172.16.2.69`, Routeur 2 sur le VLAN 30 `172.16.2.70`, Web 2 `172.16.2.71`, reverse proxy `172.16.3.162`. Les caméras utilisent les adresses disponibles du VLAN 70.
 
-| Ports SW-L3 | Mode | VLAN | Usage |
-| --- | --- | ---: | --- |
-| Gi1/0/1 à 4 | Access | 10 | Service 1 |
-| Gi1/0/5 à 8 | Access | 20 | Service 2 |
-| Gi1/0/9 à 12 | Access | 30 | Serveurs / Routeur 2 selon raccordement |
-| Gi1/0/13 à 16 | Access | 40 | Wi-Fi employés |
-| Gi1/0/17 à 20 | Access | 50 | VoIP |
-| Gi1/0/21 | Access | 99 | Administration |
-| Gi1/0/22 | Access | 60 | Wi-Fi invités |
-| Gi1/0/23 | Access | 70 | Caméra IP |
-| Gi1/0/24 | Routé L3 | Transit | Routeur 1 |
+## 2. Liens et ports
 
-Le VLAN 80 est créé mais aucun port ne lui est attribué tant que son usage n'est pas confirmé. Un point d'accès multi-SSID devra utiliser un trunk avec une liste de VLAN limitée.
+| Lien | Mode | VLAN autorisés | Rôle |
+| --- | --- | --- | --- |
+| SW-L3 Gi1/0/22 ↔ R2 Gi0/0 | trunk 802.1Q | 30, 70, 71 | Routeur 2 porte les passerelles DMZ |
+| SW-L3 Gi1/0/23 ↔ Proxmox 2 | trunk 802.1Q | 30, 70, 71 | Gestion Proxmox en VLAN 30, VM dans les DMZ |
+| SW-L3 Gi1/0/24 ↔ Routeur 1 | routé L3 | inchangé | Lien existant à ne pas modifier |
 
-## 4. Routage et services
+Les ports Gi1/0/1-4, 5-8, 9-12, 13-16 et 17-20 sont respectivement en accès dans les VLAN 10, 20, 30, 40 et 50. Gi1/0/21 est le poste d'administration du VLAN 99.
 
-Le SW-L3 route les VLAN et utilise `172.16.137.1` comme route par défaut. Routeur 2 utilise `172.16.130.1` comme route par défaut et dessert `172.16.138.0/24`. Windows Server fournit AD, DNS et DHCP sur `172.16.130.10`; les SVI clientes relaient DHCP vers cette adresse. Zabbix est proposé en `172.16.130.11`.
+## 3. Routage et filtrage
 
-Le reverse proxy `172.16.138.10` est la seule cible Web autorisée. Web 1 et Web 2 restent derrière Routeur 2. Les interfaces d'administration ne sont accessibles que depuis le VLAN 99.
+Le switch L3 est la passerelle des huit VLAN LAN. Routeur 2 est la passerelle des VLAN DMZ et utilise `172.16.2.65` comme sortie vers le LAN. Le switch route `172.16.3.128/27` et `172.16.3.160/27` vers `172.16.2.70`. Le lien vers Routeur 1 et sa route par défaut restent tels qu'ils étaient.
 
-## 5. Politique ACL
+Les ACL du switch autorisent DNS, DHCP et les services nécessaires, puis bloquent les accès inter-réseaux non prévus. Les ACL de Routeur 2 autorisent HTTP/HTTPS vers le reverse proxy `172.16.3.162`, puis du reverse proxy vers Web 1 `172.16.2.69` et Web 2 `172.16.2.71`. Les caméras sont limitées à leur supervision et les nouvelles connexions de la DMZ vers le LAN sont refusées par défaut.
 
-- VLAN 10 et 20 : DNS, DHCP, AD et HTTPS vers `172.16.130.10`, puis Internet ; autres réseaux internes refusés.
-- VLAN 40 : mêmes services d'entreprise, accès aux VLAN 10/20 selon besoin ; autres réseaux privés refusés.
-- VLAN 50 : DHCP/DNS et IPBX `172.16.130.12` ; autres réseaux internes refusés.
-- VLAN 60 : DHCP, DNS et Internet uniquement ; aucun accès privé.
-- VLAN 70 : supervision Zabbix `172.16.130.11:10051` uniquement ; autres flux refusés.
-- VLAN 80 : bloqué en attente d'un usage.
-- VLAN 99 : administration SSH/HTTPS/8006 et diagnostic vers les équipements et serveurs autorisés.
-- Zone `172.16.138.0/24` : reverse proxy vers Web 1/Web 2 ; pas de nouvelles connexions vers les VLAN internes.
+## 4. Recette
 
-Les ACL sont dans `Infrastructure/Switch L3.txt` et `Infrastructure/Routeur 2.txt`. Les règles sont des modèles ; vérifier les retours TCP/UDP/ICMP et les compteurs avant sauvegarde.
-
-## 6. Mise en service
-
-1. Faire valider le découpage `/24` dans le bloc `/18`.
-2. Relever les modèles, ports, versions IOS et câbles ; exporter les configurations initiales.
-3. Configurer les VLAN, SVI, relais DHCP, ports et SSH du SW-L3.
-4. Configurer Routeur 2, Proxmox 2, le reverse proxy et les Web.
-5. Tester les flux autorisés et interdits, puis vérifier les routes retour.
-6. Sauvegarder uniquement après validation positive et négative.
+1. Vérifier `show vlan brief`, `show interfaces trunk` et `show ip interface brief`.
+2. Vérifier les routes et le ping entre `172.16.2.65`, `172.16.2.70`, `172.16.3.129` et `172.16.3.161`.
+3. Tester DHCP/DNS depuis les VLAN 10, 20 et 40.
+4. Tester HTTP/HTTPS via `172.16.3.162`, puis vérifier que le proxy atteint `172.16.2.69` et `172.16.2.71`.
+5. Tester SSH depuis le VLAN 99 et le refus depuis un autre VLAN.
+6. Contrôler les compteurs avec `show access-lists` et sauvegarder après validation.

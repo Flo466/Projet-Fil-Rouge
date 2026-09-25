@@ -1,38 +1,28 @@
-# Audit documentaire et de préparation - Site C
+# Audit documentaire et préparation - Site C
 
 ## Périmètre
 
-Cet audit compare les fichiers du dépôt avec la nouvelle consigne d'adressage photographiée et avec la procédure `audit_infrastructure_reellement_deployee.html`. Il s'agit d'un audit documentaire : aucune connexion au switch, au routeur, au pare-feu ou aux VM n'a été possible depuis VS Code. Les constats « déployé » devront donc être prouvés par des exports et des tests sur la maquette autorisée.
+Cet audit vérifie que les fichiers de Site C utilisent le plan fourni par l'équipe et que les rôles du switch L3, de Routeur 2, de Proxmox 2 et de la DMZ sont compréhensibles. C'est un audit de configuration préparée : aucune connexion directe aux équipements n'a été faite depuis VS Code.
 
-## Référence d'adressage
+## Plan contrôlé
 
-| Élément | Valeur retenue |
-| --- | --- |
-| Site | Site 3 - notre site |
-| Bloc | `172.16.128.0/18` |
-| Masque | `255.255.192.0` |
-| Plage | `172.16.128.0` à `172.16.191.255` |
-| Découpage interne | Proposition `/24` par VLAN, à valider |
+| Zone | Réseau fourni | Découpage retenu |
+| --- | --- | --- |
+| LAN privé | `172.16.2.0/24` | 8 sous-réseaux `/27` pour les VLAN 10, 20, 30, 40, 50, 60, 80 et 99 |
+| DMZ | `172.16.3.128/26` | VLAN 70 en `172.16.3.128/27`, VLAN 71 en `172.16.3.160/27` |
 
-## Constats
+Le tableau complet avec les passerelles est dans [Dossier réseau](Dossier_reseau.md) et [Infrastructure/README.md](../README.md).
 
-| ID | Niveau | Constat | Action |
-| --- | --- | --- | --- |
-| A-01 | Élevé | Les anciens fichiers utilisaient `192.168.0.0/28`, hors du bloc Site 3. | Remplacés dans les documents et les configurations de travail par `172.16.128.0/18`. |
-| A-02 | Élevé | La photo ne fournit pas le découpage interne du `/18`. | Les `/24` utilisés ici sont marqués « à valider » partout. |
-| A-03 | Élevé | Une configuration ne peut pas être déclarée conforme sans preuve de l'équipement réel. | Relever running-config, câblage, tables MAC/ARP et résultats de tests. |
-| A-04 | Moyen | Les adresses WAN, le NAT, le domaine AD et les ports applicatifs ne sont pas fournis. | Compléter après inventaire et conserver les valeurs confirmées. |
-| A-05 | Moyen | Les accès d'administration et les flux inter-VLAN doivent être testés en positif et en négatif. | Exécuter la recette depuis chaque VLAN et conserver les preuves. |
+## Contrôles préparés
 
-## Éléments préparés dans le dépôt
+- Le VLAN 30 conserve la gestion de Proxmox 2, les serveurs internes et les deux serveurs Web `172.16.2.69` et `172.16.2.71`.
+- Les trunks SW-L3 ↔ Routeur 2 et SW-L3 ↔ Proxmox 2 autorisent seulement les VLAN 30, 70 et 71.
+- Routeur 2 porte `172.16.3.129` et `172.16.3.161`, les passerelles des deux sous-réseaux DMZ.
+- Le VLAN 70 contient les caméras DMZ et le VLAN 71 contient le reverse proxy `172.16.3.162`, qui relaie vers les deux serveurs Web du VLAN 30.
+- Le lien SW-L3 ↔ Routeur 1 (`Gi1/0/24`) est explicitement conservé sans changement.
+- Les ACL gardent les services nécessaires et limitent l'administration au VLAN 99.
 
-- `Infrastructure/Switch L3.txt` conserve les noms de VLAN, les ports, les SVI, le relais DHCP, les ACL et SSH.
-- `Infrastructure/Routeur 2.txt` contient les interfaces, les routes, les ACL d'isolation de Proxmox 2 et SSH.
-- `Infrastructure/Plan_adressage_Site_C.md` centralise le bloc `/18` et le découpage de travail.
-- `Infrastructure/docs/Dossier_reseau.md` et `Configuration_Reseau_Commandes.md` utilisent les mêmes adresses.
-- `Infrastructure/configuration/DMZ/Config_Ansible` utilise les adresses du réseau applicatif de travail `172.16.138.0/24`.
-
-## Preuves à recueillir sur la maquette
+## Preuves à recueillir sur le matériel
 
 ```text
 show version
@@ -47,18 +37,8 @@ show mac address-table
 show arp
 ```
 
-Depuis des postes autorisés :
+Tests à faire : ping des passerelles LAN et DMZ, renouvellement DHCP, résolution DNS, supervision des caméras vers Zabbix, accès Web via `172.16.3.162`, accès du reverse proxy vers `172.16.2.69` et `172.16.2.71`, SSH depuis le VLAN 99 et refus d'un accès DMZ vers les VLAN internes.
 
-```text
-ipconfig /all
-ipconfig /renew
-ping <passerelle-du-vlan>
-tracert <destination>
-nslookup <nom-interne> <serveur-dns>
-```
+## Résultat
 
-Tester au minimum : DNS/DHCP/AD depuis les VLAN 10, 20 et 40 ; Internet depuis le VLAN 60 sans accès aux réseaux privés ; supervision des caméras depuis Zabbix ; Web via le reverse proxy ; administration SSH depuis le VLAN 99 ; refus du réseau Proxmox 2 vers les VLAN internes.
-
-## Conclusion
-
-La documentation et les configurations sont alignées sur le bloc `172.16.128.0/18` et conservent tous les VLAN et ACL demandés. Le site ne peut pas être déclaré conforme ou réellement déployé avant validation du découpage `/24` et collecte des preuves sur les équipements.
+La structure du dépôt contient une configuration lisible et un plan d'adressage cohérent avec les réseaux fournis. La conformité « réellement déployée » ne pourra être déclarée qu'après comparaison avec les sorties ci-dessus et validation du câblage réel.

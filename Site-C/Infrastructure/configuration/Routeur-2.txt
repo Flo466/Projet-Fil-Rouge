@@ -1,0 +1,125 @@
+! SITE C - ROUTEUR 2
+! Router-on-a-stick vers le switch L3.
+! VLAN 30 = transit/gestion et serveurs Web, VLAN 70 = cameras DMZ,
+! VLAN 71 = reverse proxy DMZ.
+
+enable
+configure terminal
+hostname R2-SITE-C
+no ip domain-lookup
+
+! Lien trunk vers SW-L3 Gi1/0/22.
+interface GigabitEthernet0/0
+ description TRUNK_VERS_SW-L3
+ no ip address
+ no shutdown
+exit
+
+interface GigabitEthernet0/0.30
+ description VLAN30_TRANSIT_PROXMOX2
+ encapsulation dot1q 30 native
+ ip address 172.16.2.70 255.255.255.224
+ no shutdown
+exit
+
+interface GigabitEthernet0/0.70
+ description CAMERAS_DMZ
+ encapsulation dot1q 70
+ ip address 172.16.3.129 255.255.255.224
+ no shutdown
+exit
+
+interface GigabitEthernet0/0.71
+ description DMZ_REVERSE_PROXY
+ encapsulation dot1q 71
+ ip address 172.16.3.161 255.255.255.224
+ no shutdown
+exit
+
+! Route par defaut vers le switch L3.
+ip route 0.0.0.0 0.0.0.0 172.16.2.65
+! Retour vers les VLAN LAN portes par le switch L3.
+ip route 172.16.2.0 255.255.255.224 172.16.2.65
+ip route 172.16.2.32 255.255.255.224 172.16.2.65
+ip route 172.16.2.96 255.255.255.224 172.16.2.65
+ip route 172.16.2.128 255.255.255.224 172.16.2.65
+ip route 172.16.2.160 255.255.255.224 172.16.2.65
+ip route 172.16.2.192 255.255.255.224 172.16.2.65
+ip route 172.16.2.224 255.255.255.224 172.16.2.65
+
+! SSH reserve au VLAN 99.
+ip domain name site-c.local
+username admin privilege 15 secret A_REMPLACER
+crypto key generate rsa modulus 2048
+ip ssh version 2
+ip access-list standard SSH_VLAN99_ONLY
+ permit 172.16.2.224 0.0.0.31
+ deny any log
+exit
+line vty 0 15
+ login local
+ transport input ssh
+ access-class SSH_VLAN99_ONLY in
+ exec-timeout 10 0
+exit
+
+! Depuis le LAN, seul le reverse proxy est publie en HTTP/HTTPS.
+ip access-list extended ACL_R2_VLAN30_IN
+ permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 443
+ permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 443
+ permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 443
+ permit tcp 172.16.2.224 0.0.0.31 172.16.3.128 0.0.0.63 eq 22
+ permit tcp 172.16.2.224 0.0.0.31 172.16.3.128 0.0.0.63 eq 8006
+ permit icmp 172.16.2.224 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.64 0.0.0.31 172.16.3.128 0.0.0.63
+ deny ip 172.16.2.0 0.0.0.255 172.16.3.128 0.0.0.63 log
+ deny ip any 172.16.3.128 0.0.0.63 log
+ permit ip any any
+exit
+interface GigabitEthernet0/0.30
+ ip access-group ACL_R2_VLAN30_IN in
+exit
+
+! Le reverse proxy DMZ peut joindre les deux serveurs Web du VLAN 30 uniquement en HTTP/HTTPS.
+ip access-list extended ACL_R2_PROXY_DMZ_IN
+ permit tcp host 172.16.3.162 host 172.16.2.69 eq 80
+ permit tcp host 172.16.3.162 host 172.16.2.69 eq 443
+ permit tcp host 172.16.3.162 host 172.16.2.71 eq 80
+ permit tcp host 172.16.3.162 host 172.16.2.71 eq 443
+ permit tcp 172.16.3.160 0.0.0.31 172.16.2.0 0.0.0.255 established
+ permit icmp 172.16.3.160 0.0.0.31 172.16.2.0 0.0.0.255 echo-reply
+ deny ip 172.16.3.160 0.0.0.31 172.16.2.0 0.0.0.255 log
+ deny ip 172.16.3.160 0.0.0.31 any log
+exit
+interface GigabitEthernet0/0.70
+ ip access-group ACL_R2_CAMERAS_DMZ_IN in
+exit
+
+! Les cameras DMZ ne creent pas de nouvelles connexions vers le LAN.
+ip access-list extended ACL_R2_CAMERAS_DMZ_IN
+ permit udp 172.16.3.128 0.0.0.31 host 172.16.2.66 eq 53
+ permit udp 172.16.3.128 0.0.0.31 host 172.16.2.67 eq 10051
+ permit tcp 172.16.3.128 0.0.0.31 host 172.16.2.67 eq 10051
+ permit tcp 172.16.3.128 0.0.0.31 172.16.2.0 0.0.0.255 established
+ permit icmp 172.16.3.128 0.0.0.31 172.16.2.0 0.0.0.255 echo-reply
+ deny ip 172.16.3.128 0.0.0.31 172.16.2.0 0.0.0.255 log
+ deny ip 172.16.3.128 0.0.0.31 any log
+exit
+interface GigabitEthernet0/0.71
+ ip access-group ACL_R2_PROXY_DMZ_IN in
+exit
+
+end
+write memory
+
+! Verification :
+! show interfaces trunk
+! show ip interface brief
+! show ip route
+! show access-lists
+! ping 172.16.2.65
+! ping 172.16.3.129
+! ping 172.16.3.161
