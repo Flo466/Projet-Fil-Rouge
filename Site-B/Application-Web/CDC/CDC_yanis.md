@@ -344,7 +344,7 @@ L’intégration avec GLPI est recommandée afin de ne pas recréer un moteur co
 | ID | Exigence | Priorité |
 | --- | --- | --- |
 | ADM-NET-001 | Le portail d’administration doit être hébergé sur des serveurs distincts de ceux du portail salarié. | Critique |
-| ADM-NET-002 | Le portail doit être accessible uniquement depuis les adresses du VLAN d’administration autorisé. Pour Site-B, le réseau candidat est 192.168.40.0/24, à confirmer avant déploiement. | Critique |
+| ADM-NET-002 | Le portail doit être accessible uniquement depuis les adresses du VLAN d’administration autorisé. Pour Site-B, le réseau est 172.16.1.96/27, conformément au schéma Site B version 1.1. | Critique |
 | ADM-NET-003 | Une adresse extérieure au VLAN d’administration doit recevoir un statut HTTP 403 avant d’atteindre l’application ou la page de connexion. | Critique |
 | ADM-NET-004 | Les ACL du switch et du pare-feu doivent compléter le filtrage Nginx. | Critique |
 | ADM-NET-005 | Le portail ne doit pas être joignable depuis les VLAN salariés, Wi-Fi, serveurs ordinaires ou Internet. | Critique |
@@ -432,22 +432,31 @@ Toute future fonction de modification devra inclure :
 
 Légende : **C** consulter, **A** agir ou modifier dans son périmètre, **V** valider, **—** aucun accès.
 
+### Portail Employé
+
 | Ressource ou fonction | Employé | Direction | Technicien | Admin d’agence | Admin global |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Annonces et état de ses services | C | C | C | C | C |
 | Profil personnel | C/A limité | C/A limité | C/A limité | C/A limité | C/A limité |
-| Rôle, agence et droits personnels | — | — | — | — | C/A |
 | Services autorisés | C | C | C | C | C |
 | VM personnelle | C/connexion | C/connexion | Selon mission | Affectation locale | Affectation globale |
+| Création d’un ticket | A | A | A | A | A |
+| Suivi de ses tickets | C | C | C | C | C |
+| Demande de droit supplémentaire | A | A | A | A | A |
+
+### Portail Admin
+
+| Ressource ou fonction | Technicien | Admin d’agence | Admin global |
+| --- | :---: | :---: | :---: | :---: | :---: |
 | Création d’un ticket | A | A | A | A | A |
 | Suivi de ses tickets | C | C | C | C | C |
 | Traitement des tickets | — | — | A | A/V local | A/V global |
 | Demande de droit supplémentaire | A | A | A | A | A |
 | Validation d’un droit | — | — | — | V local | V global |
-| Tableau de bord technique | — | Synthèse autorisée | C | C local | C global |
-| Utilisateurs d’administration | — | — | — | C/A local limité | C/A global |
-| Agences | — | Synthèse | C | C local | C/A global |
-| Réseau et VLAN | — | — | C | C local | C global |
+| Tableau de bord technique | — | Synthèse autorisée | C Selon Mission | C local | C global |
+| Utilisateurs d’administration | — | — | — | C/A local | C/A global |
+| Agences | — | Synthèse | C Selon Mission | C local | C/A global |
+| Réseau et VLAN | — | — | C Selon Mission| C local | C global |
 | VPN et accès distant | — | — | C limité | C/A local | C/A global |
 | Serveurs, services et VM | — | — | C | C/A local | C/A global |
 | Pare-feu et sécurité | — | — | C limité | C local | C global |
@@ -841,7 +850,7 @@ Les maquettes doivent être validées avant le développement des écrans défin
 Les éléments suivants doivent être confirmés avant la réalisation :
 
 1. la liste exacte des CIDR autorisés pour le portail salarié ;
-2. la confirmation du VLAN d’administration 192.168.40.0/24 pour Site-B ;
+2. la validation des sources autorisées du VLAN d’administration 172.16.1.96/27 pour Site-B ;
 3. les noms DNS des deux portails ;
 4. l’autorité de certification utilisée ;
 5. le domaine AD, les groupes et attributs servant au mapping des rôles ;
