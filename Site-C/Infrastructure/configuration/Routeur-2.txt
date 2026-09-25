@@ -27,59 +27,28 @@ interface GigabitEthernet0/0/0
 exit
 ip route 0.0.0.0 0.0.0.0 172.16.2.65
 
-! Entree LAN : publication proxy, administration, reponses Web.
-! Ouvre l'ACL etendue (source, destination et protocole) LAN_VERS_DMZ.
-ip access-list extended LAN_VERS_DMZ
- ! Autorise TCP : tout le LAN 172.16.2.0/24 -> reverse proxy (172.16.3.162) ; port destination 80 (HTTP).
- permit tcp 172.16.2.0 0.0.0.255 host 172.16.3.162 eq 80
- ! Autorise TCP : tout le LAN 172.16.2.0/24 -> reverse proxy (172.16.3.162) ; port destination 443 (HTTPS).
- permit tcp 172.16.2.0 0.0.0.255 host 172.16.3.162 eq 443
- ! Autorise TCP : VLAN 99 (administration) [172.16.2.224/27] -> reverse proxy (172.16.3.162) ; port destination 22 (SSH).
- permit tcp 172.16.2.224 0.0.0.31 host 172.16.3.162 eq 22
- ! Autorise ICMP : VLAN 99 (administration) [172.16.2.224/27] -> reverse proxy (172.16.3.162) ; demande de ping.
- permit icmp 172.16.2.224 0.0.0.31 host 172.16.3.162 echo
- ! Autorise TCP : Web 1 (172.16.2.69) -> reverse proxy (172.16.3.162) ; port source 80 (HTTP) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
- permit tcp host 172.16.2.69 eq 80 host 172.16.3.162 established
- ! Autorise TCP : Web 1 (172.16.2.69) -> reverse proxy (172.16.3.162) ; port source 443 (HTTPS) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
- permit tcp host 172.16.2.69 eq 443 host 172.16.3.162 established
- ! Autorise TCP : Web 2 (172.16.2.71) -> reverse proxy (172.16.3.162) ; port source 80 (HTTP) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
- permit tcp host 172.16.2.71 eq 80 host 172.16.3.162 established
- ! Autorise TCP : Web 2 (172.16.2.71) -> reverse proxy (172.16.3.162) ; port source 443 (HTTPS) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
- permit tcp host 172.16.2.71 eq 443 host 172.16.3.162 established
- ! Autorise TCP : VLAN 99 (administration) [172.16.2.224/27] -> Routeur 2 cote LAN (172.16.2.70) ; port destination 22 (SSH).
- permit tcp 172.16.2.224 0.0.0.31 host 172.16.2.70 eq 22
- ! Autorise ICMP : VLAN 99 (administration) [172.16.2.224/27] -> Routeur 2 cote LAN (172.16.2.70) ; demande de ping.
- permit icmp 172.16.2.224 0.0.0.31 host 172.16.2.70 echo
- ! Refuse tout trafic IP : toute adresse -> toute adresse ; journalise les correspondances.
- deny ip any any log
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
-exit
-! Entree DMZ : proxy vers les deux Web, retours clients/admin.
-! Ouvre l'ACL etendue (source, destination et protocole) DMZ_VERS_LAN.
+! FILTRE DMZ : le proxy peut joindre les deux Web et repondre aux clients/admin.
+! Le switch filtre les VLAN clients. R2 filtre les paquets venant du proxy.
+! Sans ce filtre, R2 donnerait acces aux autres serveurs du VLAN30.
 ip access-list extended DMZ_VERS_LAN
- ! Autorise TCP : reverse proxy (172.16.3.162) -> Web 1 (172.16.2.69) ; port destination 80 (HTTP).
+ ! Autorise proxy -> Web1 : TCP port 80.
  permit tcp host 172.16.3.162 host 172.16.2.69 eq 80
- ! Autorise TCP : reverse proxy (172.16.3.162) -> Web 1 (172.16.2.69) ; port destination 443 (HTTPS).
+ ! Autorise proxy -> Web1 : TCP port 443.
  permit tcp host 172.16.3.162 host 172.16.2.69 eq 443
- ! Autorise TCP : reverse proxy (172.16.3.162) -> Web 2 (172.16.2.71) ; port destination 80 (HTTP).
+ ! Autorise proxy -> Web2 : TCP port 80.
  permit tcp host 172.16.3.162 host 172.16.2.71 eq 80
- ! Autorise TCP : reverse proxy (172.16.3.162) -> Web 2 (172.16.2.71) ; port destination 443 (HTTPS).
+ ! Autorise proxy -> Web2 : TCP port 443.
  permit tcp host 172.16.3.162 host 172.16.2.71 eq 443
- ! Autorise TCP : reverse proxy (172.16.3.162) -> tout le LAN 172.16.2.0/24 ; port source 80 (HTTP) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
+ ! Autorise proxy -> LAN : port source 80, TCP ; retour TCP (ACK/RST).
  permit tcp host 172.16.3.162 eq 80 172.16.2.0 0.0.0.255 established
- ! Autorise TCP : reverse proxy (172.16.3.162) -> tout le LAN 172.16.2.0/24 ; port source 443 (HTTPS) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
+ ! Autorise proxy -> LAN : port source 443, TCP ; retour TCP (ACK/RST).
  permit tcp host 172.16.3.162 eq 443 172.16.2.0 0.0.0.255 established
- ! Autorise TCP : reverse proxy (172.16.3.162) -> VLAN 99 (administration) [172.16.2.224/27] ; port source 22 (SSH) ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
+ ! Autorise proxy -> VLAN99 : port source 22, TCP ; retour TCP (ACK/RST).
  permit tcp host 172.16.3.162 eq 22 172.16.2.224 0.0.0.31 established
- ! Autorise ICMP : reverse proxy (172.16.3.162) -> VLAN 99 (administration) [172.16.2.224/27] ; reponse au ping uniquement.
+ ! Autorise proxy -> VLAN99 : ICMP ; reponse au ping.
  permit icmp host 172.16.3.162 172.16.2.224 0.0.0.31 echo-reply
- ! Refuse tout trafic IP : toute adresse -> toute adresse ; journalise les correspondances.
+ ! Bloque tout le reste et journalise.
  deny ip any any log
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
-exit
-interface GigabitEthernet0/0/1
- ! Applique LAN_VERS_DMZ aux paquets entrant depuis ce reseau dans l'equipement.
- ip access-group LAN_VERS_DMZ in
 exit
 interface GigabitEthernet0/0/0
  ! Applique DMZ_VERS_LAN aux paquets entrant depuis ce reseau dans l'equipement.
@@ -90,13 +59,11 @@ ip domain name yai.local
 username admin privilege 15 secret A_REMPLACER
 crypto key generate rsa modulus 2048
 ip ssh version 2
-! Ouvre l'ACL standard (filtre la source) SSH_VLAN99.
 ip access-list standard SSH_VLAN99
  ! Autorise les sources du VLAN 99 : 172.16.2.224/27, wildcard 0.0.0.31.
  permit 172.16.2.224 0.0.0.31
  ! Refuse les sources restantes (tout autre reseau) ; journalise les correspondances.
  deny any log
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 line vty 0 15
  login local

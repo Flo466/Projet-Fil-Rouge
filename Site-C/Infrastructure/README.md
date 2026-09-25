@@ -1,4 +1,6 @@
-# Plan d'adressage — Site C
+# Site C — plan d’adressage
+
+Commencer par le [schéma de l’infrastructure](docs/Dossier_reseau.md#schéma-de-linfrastructure), puis ce plan et le [fonctionnement](docs/Dossier_reseau.md). Le schéma inclut un pare-feu prévu côté R1, dont la configuration reste à définir. Les deux configurations sont [Switch L3](configuration/Switch-L3.txt) et [Routeur 2](configuration/Routeur-2.txt). Les PDF conservés dans ce dossier sont des documents sources : ce plan fait référence pour les adresses actuelles.
 
 **LAN : 172.16.2.0/24**, découpé en 8 /27 : 7 attribués et 1 bloc IP libre. **DMZ : 172.16.3.128/26**, divisée en 2 /27. Tous les sous-réseaux utilisent le masque **255.255.255.224** (30 hôtes, passerelle comprise).
 

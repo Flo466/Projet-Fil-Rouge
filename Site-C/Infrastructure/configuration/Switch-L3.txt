@@ -12,7 +12,7 @@
 ! LAN : 172.16.2.0/24 sept sous-reseaux /27 utilises ; 172.16.2.192/27 libre sans VLAN.
 ! Reserve IP : 172.16.2.193 a 172.16.2.222 ; reseau .192, broadcast .223.
 ! Aucun VLAN, SVI ou passerelle pour cette reserve.
-! DMZ : 172.16.3.128/26 decoupee en VLAN 70 cameras et VLAN 71 reverse proxy.
+! DMZ : 172.16.3.128/26 decoupee en VLAN 70 cameras et reseau dedie au reverse proxy derriere R2.
 
 enable
 configure terminal
@@ -55,7 +55,9 @@ interface Vlan20
  ip helper-address 172.16.2.66
  no shutdown
 interface Vlan30
- description GW_SERVEURS_PROXMOX2_WEB
+ ! Garde le trajet des serveurs vers R2 via la passerelle du switch.
+ no ip redirects
+ description GW_SERVEURS_3_PROXMOX_WEB
  ip address 172.16.2.65 255.255.255.224
  no shutdown
 interface Vlan40
@@ -100,7 +102,7 @@ interface range GigabitEthernet1/0/5 - 8
  spanning-tree portfast
  no shutdown
 interface range GigabitEthernet1/0/9 - 12
- description ACCES_SERVEURS_PROXMOX2_WEB
+ description ACCES_SERVEURS_3_PROXMOX_WEB
  switchport mode access
  switchport access vlan 30
  spanning-tree portfast
@@ -162,13 +164,11 @@ ip domain name yai.local
 username admin privilege 15 secret A_REMPLACER
 crypto key generate rsa modulus 2048
 ip ssh version 2
-! Ouvre l'ACL standard (filtre la source) SSH_VLAN99.
 ip access-list standard SSH_VLAN99
  ! Autorise les sources du VLAN 99 : 172.16.2.224/27, wildcard 0.0.0.31.
  permit 172.16.2.224 0.0.0.31
  ! Refuse les sources restantes (tout autre reseau) ; journalise les correspondances.
  deny any log
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 line vty 0 15
  login local
@@ -182,37 +182,35 @@ exit
 ! ACL PAR VLAN - LOGIQUE DE LA CONFIGURATION FOURNIE
 ! =========================
 ! VLAN 10 : acces VLAN 20/40, services, reverse proxy, puis sortie generale.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_VLAN10.
 ip access-list extended ACL_VLAN10
  ! Autorise DHCP UDP 68 -> 67, meme avant attribution d'IP (source 0.0.0.0 et diffusion possibles).
  permit udp any eq 68 any eq 67
- ! Autorise UDP : VLAN 10 (service 1) [172.16.2.0/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 67 (serveur DHCP).
+ ! Autorise VLAN10 -> DNS/DHCP : UDP port 67.
  permit udp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 67
- ! Autorise UDP : VLAN 10 (service 1) [172.16.2.0/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN10 -> DNS/DHCP : UDP port 53.
  permit udp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise TCP : VLAN 10 (service 1) [172.16.2.0/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN10 -> DNS/DHCP : TCP port 53.
  permit tcp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 20 (service 2) [172.16.2.32/27].
+ ! Autorise VLAN10 -> VLAN20 : IP.
  permit ip 172.16.2.0 0.0.0.31 172.16.2.32 0.0.0.31
- ! Autorise TCP : VLAN 10 (service 1) [172.16.2.0/27] -> reverse proxy (172.16.3.162) ; port destination 80 (HTTP).
+ ! Autorise VLAN10 -> proxy : TCP port 80.
  permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 80
- ! Autorise TCP : VLAN 10 (service 1) [172.16.2.0/27] -> reverse proxy (172.16.3.162) ; port destination 443 (HTTPS).
+ ! Autorise VLAN10 -> proxy : TCP port 443.
  permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 443
- ! Refuse tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 30 (serveurs) [172.16.2.64/27].
+ ! Bloque VLAN10 -> VLAN30 : IP.
  deny ip 172.16.2.0 0.0.0.31 172.16.2.64 0.0.0.31
- ! Refuse tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 50 (VoIP) [172.16.2.128/27].
+ ! Bloque VLAN10 -> VLAN50 : IP.
  deny ip 172.16.2.0 0.0.0.31 172.16.2.128 0.0.0.31
- ! Refuse tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 60 (invites) [172.16.2.160/27].
+ ! Bloque VLAN10 -> VLAN60 : IP.
  deny ip 172.16.2.0 0.0.0.31 172.16.2.160 0.0.0.31
- ! Refuse tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 99 (administration) [172.16.2.224/27].
+ ! Bloque VLAN10 -> VLAN99 : IP.
  deny ip 172.16.2.0 0.0.0.31 172.16.2.224 0.0.0.31
- ! Refuse tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> les deux sous-reseaux DMZ 172.16.3.128/26.
+ ! Bloque VLAN10 -> deux reseaux DMZ : IP.
  deny ip 172.16.2.0 0.0.0.31 172.16.3.128 0.0.0.63
- ! Autorise tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> VLAN 40 (Wi-Fi employes) [172.16.2.96/27].
+ ! Autorise VLAN10 -> VLAN40 : IP.
  permit ip 172.16.2.0 0.0.0.31 172.16.2.96 0.0.0.31
- ! Autorise tout trafic IP : VLAN 10 (service 1) [172.16.2.0/27] -> toute adresse.
+ ! Autorise VLAN10 -> toute destination : IP.
  permit ip 172.16.2.0 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan10
  ! Applique ACL_VLAN10 aux paquets entrant depuis ce reseau dans l'equipement.
@@ -220,37 +218,35 @@ interface Vlan10
 exit
 
 ! VLAN 20 : meme politique que VLAN 10.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_VLAN20.
 ip access-list extended ACL_VLAN20
  ! Autorise DHCP UDP 68 -> 67, meme avant attribution d'IP (source 0.0.0.0 et diffusion possibles).
  permit udp any eq 68 any eq 67
- ! Autorise UDP : VLAN 20 (service 2) [172.16.2.32/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 67 (serveur DHCP).
+ ! Autorise VLAN20 -> DNS/DHCP : UDP port 67.
  permit udp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 67
- ! Autorise UDP : VLAN 20 (service 2) [172.16.2.32/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN20 -> DNS/DHCP : UDP port 53.
  permit udp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise TCP : VLAN 20 (service 2) [172.16.2.32/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN20 -> DNS/DHCP : TCP port 53.
  permit tcp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 10 (service 1) [172.16.2.0/27].
+ ! Autorise VLAN20 -> VLAN10 : IP.
  permit ip 172.16.2.32 0.0.0.31 172.16.2.0 0.0.0.31
- ! Autorise TCP : VLAN 20 (service 2) [172.16.2.32/27] -> reverse proxy (172.16.3.162) ; port destination 80 (HTTP).
+ ! Autorise VLAN20 -> proxy : TCP port 80.
  permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 80
- ! Autorise TCP : VLAN 20 (service 2) [172.16.2.32/27] -> reverse proxy (172.16.3.162) ; port destination 443 (HTTPS).
+ ! Autorise VLAN20 -> proxy : TCP port 443.
  permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 443
- ! Refuse tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 30 (serveurs) [172.16.2.64/27].
+ ! Bloque VLAN20 -> VLAN30 : IP.
  deny ip 172.16.2.32 0.0.0.31 172.16.2.64 0.0.0.31
- ! Refuse tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 50 (VoIP) [172.16.2.128/27].
+ ! Bloque VLAN20 -> VLAN50 : IP.
  deny ip 172.16.2.32 0.0.0.31 172.16.2.128 0.0.0.31
- ! Refuse tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 60 (invites) [172.16.2.160/27].
+ ! Bloque VLAN20 -> VLAN60 : IP.
  deny ip 172.16.2.32 0.0.0.31 172.16.2.160 0.0.0.31
- ! Refuse tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 99 (administration) [172.16.2.224/27].
+ ! Bloque VLAN20 -> VLAN99 : IP.
  deny ip 172.16.2.32 0.0.0.31 172.16.2.224 0.0.0.31
- ! Refuse tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> les deux sous-reseaux DMZ 172.16.3.128/26.
+ ! Bloque VLAN20 -> deux reseaux DMZ : IP.
  deny ip 172.16.2.32 0.0.0.31 172.16.3.128 0.0.0.63
- ! Autorise tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> VLAN 40 (Wi-Fi employes) [172.16.2.96/27].
+ ! Autorise VLAN20 -> VLAN40 : IP.
  permit ip 172.16.2.32 0.0.0.31 172.16.2.96 0.0.0.31
- ! Autorise tout trafic IP : VLAN 20 (service 2) [172.16.2.32/27] -> toute adresse.
+ ! Autorise VLAN20 -> toute destination : IP.
  permit ip 172.16.2.32 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan20
  ! Applique ACL_VLAN20 aux paquets entrant depuis ce reseau dans l'equipement.
@@ -280,20 +276,20 @@ ip access-list extended ACL_VLAN30
  permit udp host 172.16.2.66 eq 53 172.16.3.128 0.0.0.31
  ! Reponses DNS du seul serveur .66 vers 172.16.3.128 ; port source 53.
  permit tcp host 172.16.2.66 eq 53 172.16.3.128 0.0.0.31 established
- ! Reponses DHCP du serveur vers le relais SVI 172.16.2.1 ; UDP 67 vers 67.
- permit udp host 172.16.2.66 eq 67 host 172.16.2.1 eq 67
- ! Reponses DHCP du serveur vers le relais SVI 172.16.2.33 ; UDP 67 vers 67.
- permit udp host 172.16.2.66 eq 67 host 172.16.2.33 eq 67
- ! Reponses DHCP du serveur vers le relais SVI 172.16.2.97 ; UDP 67 vers 67.
- permit udp host 172.16.2.66 eq 67 host 172.16.2.97 eq 67
- ! Reponses DHCP du serveur vers le relais SVI 172.16.2.129 ; UDP 67 vers 67.
- permit udp host 172.16.2.66 eq 67 host 172.16.2.129 eq 67
- ! Reponses DHCP du serveur vers le relais SVI 172.16.2.161 ; UDP 67 vers 67.
- permit udp host 172.16.2.66 eq 67 host 172.16.2.161 eq 67
+ ! DHCP : .66 repond aux relais du LAN sur UDP 67 (regle groupee sur le /24).
+ permit udp host 172.16.2.66 eq 67 172.16.2.0 0.0.0.255 eq 67
  ! Reponses DHCP aux clients LAN lors des renouvellements directs ; UDP 67 vers 68.
  permit udp host 172.16.2.66 eq 67 172.16.2.0 0.0.0.255 eq 68
  ! Reponses Zabbix aux connexions actives des cameras ; TCP source 10051, ACK/RST.
  permit tcp host 172.16.2.67 eq 10051 172.16.3.128 0.0.0.31 established
+ ! Web 1 repond au proxy depuis son port 80 ; retour TCP.
+ permit tcp host 172.16.2.69 eq 80 host 172.16.3.162 established
+ ! Web 1 repond au proxy depuis son port 443 ; retour TCP.
+ permit tcp host 172.16.2.69 eq 443 host 172.16.3.162 established
+ ! Web 2 repond au proxy depuis son port 80 ; retour TCP.
+ permit tcp host 172.16.2.71 eq 80 host 172.16.3.162 established
+ ! Web 2 repond au proxy depuis son port 443 ; retour TCP.
+ permit tcp host 172.16.2.71 eq 443 host 172.16.3.162 established
  ! Bloque les autres flux des serveurs vers le reseau prive 10.0.0.0 ; exceptions deja traitees.
  deny ip 172.16.2.64 0.0.0.31 10.0.0.0 0.255.255.255
  ! Bloque les autres flux des serveurs vers le reseau prive 172.16.0.0 ; exceptions deja traitees.
@@ -320,37 +316,35 @@ interface Vlan30
 exit
 
 ! VLAN 40 : acces VLAN 10/20, services et reverse proxy.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_WIFI_EMPLOYES.
 ip access-list extended ACL_WIFI_EMPLOYES
  ! Autorise DHCP UDP 68 -> 67, meme avant attribution d'IP (source 0.0.0.0 et diffusion possibles).
  permit udp any eq 68 any eq 67
- ! Autorise UDP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 67 (serveur DHCP).
+ ! Autorise VLAN40 -> DNS/DHCP : UDP port 67.
  permit udp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 67
- ! Autorise UDP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN40 -> DNS/DHCP : UDP port 53.
  permit udp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise TCP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN40 -> DNS/DHCP : TCP port 53.
  permit tcp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 10 (service 1) [172.16.2.0/27].
+ ! Autorise VLAN40 -> VLAN10 : IP.
  permit ip 172.16.2.96 0.0.0.31 172.16.2.0 0.0.0.31
- ! Autorise tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 20 (service 2) [172.16.2.32/27].
+ ! Autorise VLAN40 -> VLAN20 : IP.
  permit ip 172.16.2.96 0.0.0.31 172.16.2.32 0.0.0.31
- ! Autorise TCP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> reverse proxy (172.16.3.162) ; port destination 80 (HTTP).
+ ! Autorise VLAN40 -> proxy : TCP port 80.
  permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 80
- ! Autorise TCP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> reverse proxy (172.16.3.162) ; port destination 443 (HTTPS).
+ ! Autorise VLAN40 -> proxy : TCP port 443.
  permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 443
- ! Refuse tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 30 (serveurs) [172.16.2.64/27].
+ ! Bloque VLAN40 -> VLAN30 : IP.
  deny ip 172.16.2.96 0.0.0.31 172.16.2.64 0.0.0.31
- ! Refuse tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 50 (VoIP) [172.16.2.128/27].
+ ! Bloque VLAN40 -> VLAN50 : IP.
  deny ip 172.16.2.96 0.0.0.31 172.16.2.128 0.0.0.31
- ! Refuse tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 60 (invites) [172.16.2.160/27].
+ ! Bloque VLAN40 -> VLAN60 : IP.
  deny ip 172.16.2.96 0.0.0.31 172.16.2.160 0.0.0.31
- ! Refuse tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> VLAN 99 (administration) [172.16.2.224/27].
+ ! Bloque VLAN40 -> VLAN99 : IP.
  deny ip 172.16.2.96 0.0.0.31 172.16.2.224 0.0.0.31
- ! Refuse tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> les deux sous-reseaux DMZ 172.16.3.128/26.
+ ! Bloque VLAN40 -> deux reseaux DMZ : IP.
  deny ip 172.16.2.96 0.0.0.31 172.16.3.128 0.0.0.63
- ! Autorise tout trafic IP : VLAN 40 (Wi-Fi employes) [172.16.2.96/27] -> toute adresse.
+ ! Autorise VLAN40 -> toute destination : IP.
  permit ip 172.16.2.96 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan40
  ! Applique ACL_WIFI_EMPLOYES aux paquets entrant depuis ce reseau dans l'equipement.
@@ -358,23 +352,21 @@ interface Vlan40
 exit
 
 ! VLAN 50 : VoIP, DNS/DHCP et IPBX.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_VLAN50.
 ip access-list extended ACL_VLAN50
  ! Autorise DHCP UDP 68 -> 67, meme avant attribution d'IP (source 0.0.0.0 et diffusion possibles).
  permit udp any eq 68 any eq 67
- ! Autorise UDP : VLAN 50 (VoIP) [172.16.2.128/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 67 (serveur DHCP).
+ ! Autorise VLAN50 -> DNS/DHCP : UDP port 67.
  permit udp 172.16.2.128 0.0.0.31 host 172.16.2.66 eq 67
- ! Autorise UDP : VLAN 50 (VoIP) [172.16.2.128/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise VLAN50 -> DNS/DHCP : UDP port 53.
  permit udp 172.16.2.128 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise tout trafic IP : VLAN 50 (VoIP) [172.16.2.128/27] -> IPBX (172.16.2.130).
+ ! Autorise VLAN50 -> IPBX : IP.
  permit ip 172.16.2.128 0.0.0.31 host 172.16.2.130
- ! Refuse tout trafic IP : VLAN 50 (VoIP) [172.16.2.128/27] -> tout le LAN 172.16.2.0/24.
+ ! Bloque VLAN50 -> LAN : IP.
  deny ip 172.16.2.128 0.0.0.31 172.16.2.0 0.0.0.255
- ! Refuse tout trafic IP : VLAN 50 (VoIP) [172.16.2.128/27] -> les deux sous-reseaux DMZ 172.16.3.128/26.
+ ! Bloque VLAN50 -> deux reseaux DMZ : IP.
  deny ip 172.16.2.128 0.0.0.31 172.16.3.128 0.0.0.63
- ! Autorise tout trafic IP : VLAN 50 (VoIP) [172.16.2.128/27] -> toute adresse.
+ ! Autorise VLAN50 -> toute destination : IP.
  permit ip 172.16.2.128 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan50
  ! Applique ACL_VLAN50 aux paquets entrant depuis ce reseau dans l'equipement.
@@ -382,27 +374,25 @@ interface Vlan50
 exit
 
 ! VLAN 60 : invites, DNS/DHCP et sortie generale sans reseaux prives.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_WIFI_INVITES.
 ip access-list extended ACL_WIFI_INVITES
  ! Autorise DHCP UDP 68 -> 67, meme avant attribution d'IP (source 0.0.0.0 et diffusion possibles).
  permit udp any eq 68 any eq 67
- ! Autorise UDP : VLAN 60 (invites) [172.16.2.160/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 67 (serveur DHCP).
+ ! Autorise VLAN60 -> DNS/DHCP : UDP port 67.
  permit udp 172.16.2.160 0.0.0.31 host 172.16.2.66 eq 67
- ! Autorise UDP : VLAN 60 (invites) [172.16.2.160/27] -> toute adresse ; port destination 53 (DNS).
+ ! Autorise VLAN60 -> toute destination : UDP port 53.
  permit udp 172.16.2.160 0.0.0.31 any eq 53
- ! Autorise TCP : VLAN 60 (invites) [172.16.2.160/27] -> toute adresse ; port destination 53 (DNS).
+ ! Autorise VLAN60 -> toute destination : TCP port 53.
  permit tcp 172.16.2.160 0.0.0.31 any eq 53
- ! Autorise TCP : VLAN 60 (invites) [172.16.2.160/27] -> reverse proxy (172.16.3.162) ; port destination 80 (HTTP).
+ ! Autorise VLAN60 -> proxy : TCP port 80.
  permit tcp 172.16.2.160 0.0.0.31 host 172.16.3.162 eq 80
- ! Autorise TCP : VLAN 60 (invites) [172.16.2.160/27] -> reverse proxy (172.16.3.162) ; port destination 443 (HTTPS).
+ ! Autorise VLAN60 -> proxy : TCP port 443.
  permit tcp 172.16.2.160 0.0.0.31 host 172.16.3.162 eq 443
- ! Refuse tout trafic IP : VLAN 60 (invites) [172.16.2.160/27] -> tout le LAN 172.16.2.0/24.
+ ! Bloque VLAN60 -> LAN : IP.
  deny ip 172.16.2.160 0.0.0.31 172.16.2.0 0.0.0.255
- ! Refuse tout trafic IP : VLAN 60 (invites) [172.16.2.160/27] -> les deux sous-reseaux DMZ 172.16.3.128/26.
+ ! Bloque VLAN60 -> deux reseaux DMZ : IP.
  deny ip 172.16.2.160 0.0.0.31 172.16.3.128 0.0.0.63
- ! Autorise tout trafic IP : VLAN 60 (invites) [172.16.2.160/27] -> toute adresse.
+ ! Autorise VLAN60 -> toute destination : IP.
  permit ip 172.16.2.160 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan60
  ! Applique ACL_WIFI_INVITES aux paquets entrant depuis ce reseau dans l'equipement.
@@ -410,23 +400,21 @@ interface Vlan60
 exit
 
 ! VLAN 70 : cameras, supervision uniquement vers Zabbix/DNS.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_VLAN70.
 ip access-list extended ACL_VLAN70
- ! Autorise UDP : VLAN 70 (cameras) [172.16.3.128/27] -> serveur DNS/DHCP (172.16.2.66) ; port destination 53 (DNS).
+ ! Autorise cameras -> DNS/DHCP : UDP port 53.
  permit udp 172.16.3.128 0.0.0.31 host 172.16.2.66 eq 53
- ! Autorise TCP : VLAN 70 (cameras) [172.16.3.128/27] -> Zabbix (172.16.2.67) ; port destination 10051 (reception Zabbix).
+ ! Autorise cameras -> Zabbix : TCP port 10051.
  permit tcp 172.16.3.128 0.0.0.31 host 172.16.2.67 eq 10051
- ! Autorise TCP : VLAN 70 (cameras) [172.16.3.128/27] -> VLAN 99 (administration) [172.16.2.224/27] ; seulement TCP avec ACK ou RST (retours attendus, sans suivi de session).
+ ! Autorise cameras -> VLAN99 : TCP ; retour TCP (ACK/RST).
  permit tcp 172.16.3.128 0.0.0.31 172.16.2.224 0.0.0.31 established
- ! Autorise ICMP : VLAN 70 (cameras) [172.16.3.128/27] -> VLAN 99 (administration) [172.16.2.224/27] ; reponse au ping uniquement.
+ ! Autorise cameras -> VLAN99 : ICMP ; reponse au ping.
  permit icmp 172.16.3.128 0.0.0.31 172.16.2.224 0.0.0.31 echo-reply
- ! Refuse tout trafic IP : VLAN 70 (cameras) [172.16.3.128/27] -> tout le LAN 172.16.2.0/24 ; journalise les correspondances.
+ ! Bloque cameras -> LAN : IP.
  deny ip 172.16.3.128 0.0.0.31 172.16.2.0 0.0.0.255 log
- ! Refuse tout trafic IP : VLAN 70 (cameras) [172.16.3.128/27] -> DMZ du reverse proxy [172.16.3.160/27] ; journalise les correspondances.
+ ! Bloque cameras -> DMZ proxy : IP.
  deny ip 172.16.3.128 0.0.0.31 172.16.3.160 0.0.0.31 log
- ! Refuse tout trafic IP : toute adresse -> toute adresse ; journalise les correspondances.
+ ! Bloque tout le reste et journalise.
  deny ip any any log
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan70
  ! Applique ACL_VLAN70 aux paquets entrant depuis ce reseau dans l'equipement.
@@ -436,11 +424,9 @@ exit
 ! Le filtrage de la DMZ proxy est sur Routeur 2.
 
 ! VLAN 99 : administration.
-! Ouvre l'ACL etendue (source, destination et protocole) ACL_VLAN99.
 ip access-list extended ACL_VLAN99
- ! Autorise tout trafic IP : VLAN 99 (administration) [172.16.2.224/27] -> toute adresse.
+ ! Autorise VLAN99 -> toute destination : IP.
  permit ip 172.16.2.224 0.0.0.31 any
- ! Termine la definition de cette ACL ; les paquets non autorises sont refuses implicitement.
 exit
 interface Vlan99
  ! Applique ACL_VLAN99 aux paquets entrant depuis ce reseau dans l'equipement.
