@@ -16,7 +16,7 @@ Le tableau complet avec les passerelles est dans [Dossier réseau](Dossier_resea
 ## Contrôles préparés
 
 - Le VLAN 30 conserve la gestion de Proxmox 2, les serveurs internes et les deux serveurs Web `172.16.2.69` et `172.16.2.71`.
-- Les trunks SW-L3 ↔ Routeur 2 et SW-L3 ↔ Proxmox 2 autorisent seulement les VLAN 30, 70 et 71.
+- Les trunks SW-L3 ↔ Routeur 2 et SW-L3 ↔ Proxmox 2 sont préparés pour les VLAN 30, 70 et 71 ; leurs ports physiques restent à confirmer.
 - Routeur 2 porte `172.16.3.129` et `172.16.3.161`, les passerelles des deux sous-réseaux DMZ.
 - Le VLAN 70 contient les caméras DMZ et le VLAN 71 contient le reverse proxy `172.16.3.162`, qui relaie vers les deux serveurs Web du VLAN 30.
 - Le lien SW-L3 ↔ Routeur 1 (`Gi1/0/24`) est explicitement conservé sans changement.

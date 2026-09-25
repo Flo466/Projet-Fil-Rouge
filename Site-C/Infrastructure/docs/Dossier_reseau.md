@@ -28,11 +28,11 @@ Adresses prévues : AD/DNS/DHCP `172.16.2.66`, Zabbix `172.16.2.67`, Proxmox 2 `
 
 | Lien | Mode | VLAN autorisés | Rôle |
 | --- | --- | --- | --- |
-| SW-L3 Gi1/0/22 ↔ R2 Gi0/0 | trunk 802.1Q | 30, 70, 71 | Routeur 2 porte les passerelles DMZ |
-| SW-L3 Gi1/0/23 ↔ Proxmox 2 | trunk 802.1Q | 30, 70, 71 | Gestion Proxmox en VLAN 30, VM dans les DMZ |
+| SW-L3 port à confirmer ↔ R2 Gi0/0 | trunk 802.1Q | 30, 70, 71 | Routeur 2 porte les passerelles DMZ |
+| SW-L3 port à confirmer ↔ Proxmox 2 | trunk 802.1Q | 30, 70, 71 | Gestion Proxmox en VLAN 30, VM dans les DMZ |
 | SW-L3 Gi1/0/24 ↔ Routeur 1 | routé L3 | inchangé | Lien existant à ne pas modifier |
 
-Les ports Gi1/0/1-4, 5-8, 9-12, 13-16 et 17-20 sont respectivement en accès dans les VLAN 10, 20, 30, 40 et 50. Gi1/0/21 est le poste d'administration du VLAN 99.
+Les ports Gi1/0/1-4, 5-8, 9-12, 13-16 et 17-20 sont respectivement en accès dans les VLAN 10, 20, 30, 40 et 50. Gi1/0/21 est le poste d'administration du VLAN 99, Gi1/0/22 le Wi-Fi invités et Gi1/0/23 les caméras. Les ports des trunks Routeur 2 et Proxmox 2 restent à confirmer.
 
 ## 3. Routage et filtrage
 

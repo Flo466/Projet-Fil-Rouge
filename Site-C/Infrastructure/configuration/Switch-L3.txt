@@ -1,6 +1,7 @@
 ! SITE C - SWITCH L3
-! LAN 172.16.2.0/24 -> huit sous-reseaux /27
-! DMZ 172.16.3.128/26 -> VLAN 70 et 71
+! Base : configuration fournie pour le switch réel.
+! LAN : 172.16.2.0/24 decoupe en huit sous-reseaux /27.
+! DMZ : 172.16.3.128/26 decoupee en VLAN 70 cameras et VLAN 71 reverse proxy.
 
 enable
 configure terminal
@@ -8,7 +9,9 @@ hostname SW-L3-C
 no ip domain-lookup
 ip routing
 
-! 1. VLAN
+! =========================
+! CREATION DES VLAN
+! =========================
 vlan 10
  name SERVICE1
 vlan 20
@@ -31,7 +34,9 @@ vlan 99
  name MANAGEMENT
 exit
 
-! 2. Passerelles LAN (/27)
+! =========================
+! PASSERELLES / SVI LAN
+! =========================
 interface Vlan10
  description GW_SERVICE1
  ip address 172.16.2.1 255.255.255.224
@@ -70,10 +75,12 @@ interface Vlan99
  ip address 172.16.2.225 255.255.255.224
  no shutdown
 
-! Les passerelles des DMZ sont sur Routeur 2.
-! Le switch ne met donc pas d'adresse IP sur les SVI 70 et 71.
+! Les passerelles des VLAN 70 et 71 sont sur Routeur 2.
+! Le switch transporte ces VLAN mais ne porte pas leurs SVI.
 
-! 3. Ports utilisateurs
+! =========================
+! PORTS D'ACCES - MAPPING FOURNI
+! =========================
 interface range GigabitEthernet1/0/1 - 4
  description ACCES_SERVICE1
  switchport mode access
@@ -110,26 +117,47 @@ interface GigabitEthernet1/0/21
  switchport access vlan 99
  spanning-tree portfast
  no shutdown
-
-! 4. Trunks : seuls les VLAN utiles sont transportes.
 interface GigabitEthernet1/0/22
- description TRUNK_ROUTEUR2
- switchport trunk encapsulation dot1q
- switchport mode trunk
- switchport trunk native vlan 30
- switchport trunk allowed vlan 30,70,71
- switchport nonegotiate
+ description ACCES_WIFI_INVITES
+ switchport mode access
+ switchport access vlan 60
+ spanning-tree portfast
  no shutdown
 interface GigabitEthernet1/0/23
- description TRUNK_PROXMOX2
- switchport trunk encapsulation dot1q
- switchport mode trunk
- switchport trunk native vlan 30
- switchport trunk allowed vlan 30,70,71
- switchport nonegotiate
+ description ACCES_CAMERAS_DMZ
+ switchport mode access
+ switchport access vlan 70
+ spanning-tree portfast
  no shutdown
 
-! 5. LIEN ROUTEUR 1 : ne pas modifier.
+! =========================
+! TRUNKS - PORTS A CONFIRMER
+! =========================
+! Le trunk Routeur 2 doit avoir VLAN 30 natif et VLAN 70/71 autorises.
+! Le trunk Proxmox 2 doit transporter VLAN 30, 70 et 71.
+! Remplacer les deux marqueurs par les vrais ports Gi1/0/X avant application.
+! interface GigabitEthernet1/0/<PORT_R2>
+!  description TRUNK_ROUTEUR2_PORT_A_CONFIRMER
+!  switchport trunk encapsulation dot1q
+!  switchport mode trunk
+!  switchport trunk native vlan 30
+!  switchport trunk allowed vlan 30,70,71
+!  switchport nonegotiate
+!  no shutdown
+! exit
+! interface GigabitEthernet1/0/<PORT_PROXMOX2>
+!  description TRUNK_PROXMOX2_PORT_A_CONFIRMER
+!  switchport trunk encapsulation dot1q
+!  switchport mode trunk
+!  switchport trunk native vlan 30
+!  switchport trunk allowed vlan 30,70,71
+!  switchport nonegotiate
+!  no shutdown
+! exit
+
+! =========================
+! LIEN ROUTEUR 1 : NE PAS MODIFIER
+! =========================
 interface GigabitEthernet1/0/24
  description TRANSIT_ROUTEUR1_EXISTANT_NE_PAS_MODIFIER
  no switchport
@@ -138,94 +166,143 @@ interface GigabitEthernet1/0/24
 exit
 ip route 0.0.0.0 0.0.0.0 172.16.137.1
 
-! Routes vers les deux DMZ via Routeur 2 (VLAN 30).
+! Routes vers les deux sous-reseaux DMZ via Routeur 2 sur VLAN 30.
 ip route 172.16.3.128 255.255.255.224 172.16.2.70
 ip route 172.16.3.160 255.255.255.224 172.16.2.70
 
-! 6. SSH limite au VLAN 99.
-ip domain name site-c.local
+! =========================
+! SSH
+! =========================
+ip domain name yai.local
 username admin privilege 15 secret A_REMPLACER
 crypto key generate rsa modulus 2048
 ip ssh version 2
-ip access-list standard SSH_VLAN99_ONLY
+ip access-list standard SSH_VLAN99
  permit 172.16.2.224 0.0.0.31
  deny any log
 exit
 line vty 0 15
  login local
  transport input ssh
- access-class SSH_VLAN99_ONLY in
+ access-class SSH_VLAN99 in
  exec-timeout 10 0
 exit
 
-! 7. ACL simples par usage.
-! Utilisateurs : services internes necessaires, Web via reverse proxy, puis Internet.
-ip access-list extended ACL_USERS
- permit udp any host 172.16.2.66 eq 67
- permit udp any host 172.16.2.66 eq 53
- permit tcp any host 172.16.2.66 eq 53
- permit tcp any host 172.16.2.66 eq 88
- permit tcp any host 172.16.2.66 eq 389
- permit tcp any host 172.16.2.66 eq 445
- permit tcp any host 172.16.3.162 eq 80
- permit tcp any host 172.16.3.162 eq 443
- deny ip any 172.16.2.0 0.0.0.255 log
- deny ip any 172.16.3.128 0.0.0.63 log
- permit ip any any
+! =========================
+! ACL PAR VLAN - LOGIQUE DE LA CONFIGURATION FOURNIE
+! =========================
+! VLAN 10 : acces VLAN 20/40, services, reverse proxy, puis sortie generale.
+ip access-list extended ACL_VLAN10
+ permit udp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 67
+ permit udp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 53
+ permit tcp 172.16.2.0 0.0.0.31 host 172.16.2.66 eq 53
+ permit ip 172.16.2.0 0.0.0.31 172.16.2.32 0.0.0.31
+ permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.0 0.0.0.31 host 172.16.3.162 eq 443
+ deny ip 172.16.2.0 0.0.0.31 172.16.2.64 0.0.0.31
+ deny ip 172.16.2.0 0.0.0.31 172.16.2.128 0.0.0.31
+ deny ip 172.16.2.0 0.0.0.31 172.16.2.160 0.0.0.31
+ deny ip 172.16.2.0 0.0.0.31 172.16.2.224 0.0.0.31
+ deny ip 172.16.2.0 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.0 0.0.0.31 172.16.2.96 0.0.0.31
+ permit ip 172.16.2.0 0.0.0.31 any
 exit
-
-! Serveurs et Proxmox 2 : acces necessaire aux reseaux du projet.
-ip access-list extended ACL_SERVERS
- permit ip any any
-exit
-
-! VoIP : DNS/DHCP et IPBX uniquement dans le LAN, puis sortie generale.
-ip access-list extended ACL_VOIP
- permit udp any host 172.16.2.66 eq 67
- permit udp any host 172.16.2.66 eq 53
- permit ip any host 172.16.2.130
- deny ip any 172.16.2.0 0.0.0.255 log
- deny ip any 172.16.3.128 0.0.0.63 log
- permit ip any any
-exit
-
-! Invites : DNS/DHCP et Internet, aucun reseau prive.
-ip access-list extended ACL_GUESTS
- permit udp any host 172.16.2.66 eq 67
- permit udp any any eq 53
- permit tcp any any eq 53
- deny ip any 172.16.2.0 0.0.0.255 log
- deny ip any 172.16.3.128 0.0.0.63 log
- permit ip any any
-exit
-
-! Reserve : aucun flux tant que son usage n'est pas valide.
-ip access-list extended ACL_RESERVE
- deny ip any any log
-exit
-
-! Management : administration et diagnostic.
-ip access-list extended ACL_MANAGEMENT
- permit ip any any
-exit
-
-! Application des ACL apres leur declaration.
 interface Vlan10
- ip access-group ACL_USERS in
+ ip access-group ACL_VLAN10 in
+exit
+
+! VLAN 20 : meme politique que VLAN 10.
+ip access-list extended ACL_VLAN20
+ permit udp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 67
+ permit udp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 53
+ permit tcp 172.16.2.32 0.0.0.31 host 172.16.2.66 eq 53
+ permit ip 172.16.2.32 0.0.0.31 172.16.2.0 0.0.0.31
+ permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.32 0.0.0.31 host 172.16.3.162 eq 443
+ deny ip 172.16.2.32 0.0.0.31 172.16.2.64 0.0.0.31
+ deny ip 172.16.2.32 0.0.0.31 172.16.2.128 0.0.0.31
+ deny ip 172.16.2.32 0.0.0.31 172.16.2.160 0.0.0.31
+ deny ip 172.16.2.32 0.0.0.31 172.16.2.224 0.0.0.31
+ deny ip 172.16.2.32 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.32 0.0.0.31 172.16.2.96 0.0.0.31
+ permit ip 172.16.2.32 0.0.0.31 any
+exit
 interface Vlan20
- ip access-group ACL_USERS in
+ ip access-group ACL_VLAN20 in
+exit
+
+! VLAN 30 : serveurs, Proxmox 2 et Web 1/Web 2.
+ip access-list extended ACL_VLAN30
+ deny ip 172.16.2.64 0.0.0.31 172.16.2.224 0.0.0.31
+ permit ip 172.16.2.64 0.0.0.31 any
+exit
 interface Vlan30
- ip access-group ACL_SERVERS in
+ ip access-group ACL_VLAN30 in
+exit
+
+! VLAN 40 : acces VLAN 10/20, services et reverse proxy.
+ip access-list extended ACL_WIFI_EMPLOYES
+ permit udp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 67
+ permit udp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 53
+ permit tcp 172.16.2.96 0.0.0.31 host 172.16.2.66 eq 53
+ permit ip 172.16.2.96 0.0.0.31 172.16.2.0 0.0.0.31
+ permit ip 172.16.2.96 0.0.0.31 172.16.2.32 0.0.0.31
+ permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.96 0.0.0.31 host 172.16.3.162 eq 443
+ deny ip 172.16.2.96 0.0.0.31 172.16.2.64 0.0.0.31
+ deny ip 172.16.2.96 0.0.0.31 172.16.2.128 0.0.0.31
+ deny ip 172.16.2.96 0.0.0.31 172.16.2.160 0.0.0.31
+ deny ip 172.16.2.96 0.0.0.31 172.16.2.224 0.0.0.31
+ deny ip 172.16.2.96 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.96 0.0.0.31 any
+exit
 interface Vlan40
- ip access-group ACL_USERS in
+ ip access-group ACL_WIFI_EMPLOYES in
+exit
+
+! VLAN 50 : VoIP, DNS/DHCP et IPBX.
+ip access-list extended ACL_VLAN50
+ permit udp 172.16.2.128 0.0.0.31 host 172.16.2.66 eq 67
+ permit udp 172.16.2.128 0.0.0.31 host 172.16.2.66 eq 53
+ permit ip 172.16.2.128 0.0.0.31 host 172.16.2.130
+ deny ip 172.16.2.128 0.0.0.31 172.16.2.0 0.0.0.255
+ deny ip 172.16.2.128 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.128 0.0.0.31 any
+exit
 interface Vlan50
- ip access-group ACL_VOIP in
+ ip access-group ACL_VLAN50 in
+exit
+
+! VLAN 60 : invites, DNS/DHCP et sortie generale sans reseaux prives.
+ip access-list extended ACL_WIFI_INVITES
+ permit udp 172.16.2.160 0.0.0.31 host 172.16.2.66 eq 67
+ permit udp 172.16.2.160 0.0.0.31 any eq 53
+ permit tcp 172.16.2.160 0.0.0.31 any eq 53
+ permit tcp 172.16.2.160 0.0.0.31 host 172.16.3.162 eq 80
+ permit tcp 172.16.2.160 0.0.0.31 host 172.16.3.162 eq 443
+ deny ip 172.16.2.160 0.0.0.31 172.16.2.0 0.0.0.255
+ deny ip 172.16.2.160 0.0.0.31 172.16.3.128 0.0.0.63
+ permit ip 172.16.2.160 0.0.0.31 any
+exit
 interface Vlan60
- ip access-group ACL_GUESTS in
+ ip access-group ACL_WIFI_INVITES in
+exit
+
+! VLAN 80 : reserve bloquee tant que son usage n'est pas valide.
+ip access-list extended ACL_VLAN80
+ deny ip 172.16.2.192 0.0.0.31 any log
+exit
 interface Vlan80
- ip access-group ACL_RESERVE in
+ ip access-group ACL_VLAN80 in
+exit
+
+! VLAN 99 : administration.
+ip access-list extended ACL_VLAN99
+ permit ip 172.16.2.224 0.0.0.31 any
+exit
 interface Vlan99
- ip access-group ACL_MANAGEMENT in
+ ip access-group ACL_VLAN99 in
+exit
 
 end
 write memory
@@ -236,4 +313,4 @@ write memory
 ! show ip interface brief
 ! show ip route
 ! show access-lists
-! ping 172.16.2.70
+! show interfaces GigabitEthernet1/0/24

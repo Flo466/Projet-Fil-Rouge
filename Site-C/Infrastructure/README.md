@@ -33,8 +33,9 @@ La DMZ est découpée en deux sous-réseaux `/27` (`255.255.255.224`) :
 ## Liens
 
 - SW-L3 ↔ Routeur 1 : lien existant conservé tel quel, aucune adresse ni route modifiée.
-- SW-L3 `Gi1/0/22` ↔ Routeur 2 `Gi0/0` : trunk 802.1Q, VLAN autorisés 30, 70 et 71.
-- SW-L3 `Gi1/0/23` ↔ Proxmox 2 : trunk 802.1Q, VLAN autorisés 30, 70 et 71 ; VLAN 30 natif pour la gestion de Proxmox.
+- SW-L3 ↔ Routeur 2 `Gi0/0` : trunk 802.1Q, port du switch **à confirmer**, VLAN autorisés 30, 70 et 71.
+- SW-L3 ↔ Proxmox 2 : trunk 802.1Q, port du switch **à confirmer**, VLAN autorisés 30, 70 et 71 ; VLAN 30 natif pour la gestion de Proxmox.
+- Les ports connus `Gi1/0/22` (Wi-Fi invités) et `Gi1/0/23` (caméras) restent en accès comme dans l'extrait fourni.
 - Le VLAN 70 contient les caméras de la DMZ ; le VLAN 71 contient le reverse proxy.
 - Les deux serveurs Web applicatifs restent dans le VLAN 30.
 

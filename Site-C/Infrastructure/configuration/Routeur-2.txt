@@ -8,7 +8,7 @@ configure terminal
 hostname R2-SITE-C
 no ip domain-lookup
 
-! Lien trunk vers SW-L3 Gi1/0/22.
+! Lien trunk vers SW-L3 : port physique a confirmer.
 interface GigabitEthernet0/0
  description TRUNK_VERS_SW-L3
  no ip address
