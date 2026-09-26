@@ -1,154 +1,92 @@
-# Comprendre le réseau
+# Infrastructure — schéma et fonctionnement
 
-Le **switch L3** porte les passerelles des VLAN et filtre les accès des clients. **R2** relie le VLAN 30 à la DMZ du proxy et limite ce que le proxy peut joindre.
+**R1 = accès Internet ; Hillstone = filtrage entre WAN, LAN, proxy et caméras ; switch L3 = VLAN et routage interne.** Un seul pare-feu avec quatre interfaces physiques. Aucun R2, aucun VLAN caméra/proxy sur le switch.
 
 ## Schéma de l'infrastructure
 
 ```mermaid
 flowchart TB
-    WAN["Internet / accès opérateur"]
-    FW["Pare-feu périmétrique - prévu<br/>Filtre les échanges Internet du LAN et de la DMZ<br/>Interfaces et adressage à définir"]
-    WAN --- FW
-    FW ---|"Placement proposé côté WAN de R1"| R1
-    R1["Routeur 1<br/>Transit : 192.168.0.1/30"]
-    SW["Switch L3<br/>Passerelles des VLAN + ACL<br/>VLAN 30 : 172.16.2.65/27"]
-    R1 ---|"Lien existant - Gi1/0/24 : 192.168.0.2/30"| SW
-
-    CLIENTS["Postes et équipements LAN<br/>VLAN 10 / 20 : services<br/>VLAN 40 : Wi-Fi employés<br/>VLAN 50 : VoIP / IPBX 172.16.2.130<br/>VLAN 60 : invités<br/>VLAN 99 : administration"]
-    CAM["Caméras - VLAN 70<br/>172.16.3.128/27<br/>Passerelle : 172.16.3.129"]
-    SW ---|"Ports access selon le tableau ci-dessous"| CLIENTS
-    SW ---|"Gi1/0/23 - access VLAN 70"| CAM
-
-    P1["Proxmox 1 - VLAN 30<br/>Gestion : 172.16.2.72/27<br/>VM Web 1 : 172.16.2.69/27<br/>VM Web 2 : 172.16.2.71/27"]
-    SVC["Services VLAN 30 - placement VM à définir<br/>AD / DNS / DHCP : 172.16.2.66<br/>Zabbix : 172.16.2.67"]
-    SW -.-|"Raccordement logique VLAN 30"| SVC
-    P3["Proxmox 3 - VLAN 30<br/>Gestion : 172.16.2.73/27"]
-
-    subgraph P2["Proxmox 2 - un serveur physique, deux cartes séparées"]
-        LAN2["Carte 1 - bridge LAN<br/>Gestion / cluster : 172.16.2.68/27<br/>Passerelle : 172.16.2.65"]
-        DMZ2["Carte 2 - bridge DMZ<br/>Aucune IP sur l'hôte Proxmox"]
-        PROXY["VM reverse proxy<br/>172.16.3.162/27<br/>Passerelle : 172.16.3.161"]
-        DMZ2 ---|"Connexion virtuelle de la VM"| PROXY
+    NET["Internet / opérateur"] --- R1["R1 - accès Internet et NAT<br/>Côté Hillstone : 192.168.0.1/30"]
+    R1 ---|"WAN : 192.168.0.2/30"| FW["Hillstone - quatre interfaces<br/>WAN / LAN / PROXY / CAMERAS"]
+    FW ---|"LAN .6 ↔ switch .5 - 192.168.0.4/30"| SW["Switch L3 - Gi1/0/24<br/>Passerelles LAN + ACL"]
+    FW ---|"CAMERAS : 172.16.3.129/27"| CAM["Caméras .130–.158<br/>Réseau 172.16.3.128/27<br/>Switch PoE dédié si plusieurs caméras"]
+    SW --- CLIENTS["VLAN 10 / 20 : services<br/>40 : Wi-Fi employés<br/>50 : VoIP / IPBX .130<br/>60 : invités / 99 : administration"]
+    SW ---|"VLAN 30"| P1["Proxmox 1 : 172.16.2.72<br/>Web 1 : .69 / Web 2 : .71"]
+    SW ---|"VLAN 30"| P3["Proxmox 3 : 172.16.2.73"]
+    SW -.- SVC["VM LAN - placement à définir<br/>DNS/DHCP/AD : .66 ; Zabbix : .67"]
+    subgraph P2["Proxmox 2 - deux cartes séparées"]
+        LAN2["Carte 1 / bridge LAN<br/>Gestion cluster : 172.16.2.68/27"]
+        DMZ2["Carte 2 / bridge proxy<br/>Aucune IP sur l'hôte"]
+        DMZ2 --- PROXY["VM proxy : 172.16.3.162/27<br/>Passerelle : 172.16.3.161"]
     end
-
-    R2["Routeur 2 - filtre de la DMZ<br/>Gi0/0/1 LAN : 172.16.2.70/27<br/>Gi0/0/0 DMZ : 172.16.3.161/27"]
-    SW ---|"Access VLAN 30"| P1
-    SW ---|"Câble 1 - access VLAN 30"| LAN2
-    SW ---|"Access VLAN 30"| P3
-    SW ---|"Access VLAN 30 vers Gi0/0/1"| R2
-    R2 ---|"Câble 2 - Gi0/0/0 - DMZ 172.16.3.160/27"| DMZ2
-
-    classDef lan fill:#e5f0ff,stroke:#2563eb,color:#172554
-    classDef dmz fill:#fff1df,stroke:#c76a00,color:#542a00
-    classDef router fill:#edf0f4,stroke:#475569,color:#17202e
-    class P1,P3,LAN2,CLIENTS,SVC lan
-    class CAM,DMZ2,PROXY dmz
-    class SW,R1,R2 router
-    classDef firewall fill:#e4f5e9,stroke:#15803d,color:#14532d
-    class FW firewall
+    SW ---|"Câble 1 - VLAN 30"| LAN2
+    FW ---|"PROXY : 172.16.3.161/27 - câble 2"| DMZ2
+    SW -.->|"Évolution LACP, non configurée"| SW2["Deuxième switch LAN - plus tard"]
 ```
 
-- Les quatre liaisons VLAN 30 (trois Proxmox et R2) utilisent **Gi1/0/9 à Gi1/0/12**, ordre à confirmer. Les trois nœuds échangent par le switch pour le cluster.
-- Les deux cartes de Proxmox 2 restent séparées : **aucun lien entre les bridges LAN et DMZ**. Le proxy n'a qu'une carte virtuelle, côté DMZ. Les câbles sont non tagués, sans trunk.
-- DNS/DHCP `.66` et Zabbix `.67` sont également prévus dans le VLAN 30 ; leur placement sur les hôtes reste à définir. Les Web et ces services utilisent la passerelle `.65`.
-- Le bloc DMZ `172.16.3.128/26` contient les caméras `.128/27` et le proxy `.160/27`. La réserve LAN `172.16.2.192/27` n'a aucun VLAN.
-- La HA du cluster reste à configurer et tester. Le proxy est unique sur Proxmox 2 : sa panne interrompt l'accès aux sites via le proxy.
+Les trois Proxmox communiquent dans le VLAN 30, passerelle `.65`. Les deux bridges de Proxmox 2 ne sont jamais reliés ; sa VM proxy utilise uniquement la carte DMZ. Le switch PoE caméra éventuel est distinct du futur deuxième switch LAN. Les zones du Hillstone sont des réseaux sur interfaces dédiées, sans trunk.
 
-## Où placer le pare-feu ?
+## Câblage du premier switch
 
-**Base retenue pour la maquette : un pare-feu côté Internet de R1**, avec les ACL du switch et de R2. Le pare-feu est un ajout prévu au schéma, pas un équipement déjà configuré. Son modèle, ses interfaces, ses adresses, ses routes et les éventuelles règles NAT restent à définir. Le lien R1–switch existant est conservé.
-
-| Trajet | Filtrage prévu |
+| Ports | Connexion |
 |---|---|
-| Internet ↔ LAN | Pare-feu côté R1 |
-| Internet ↔ DMZ | Même pare-feu ; accès et routes à configurer si publication des sites |
-| DMZ proxy ↔ serveurs LAN | ACL de R2 et, selon le trajet, ACL du switch ; ce trafic ne traverse pas le pare-feu côté R1 |
-| Entre VLAN du switch | ACL du switch L3 |
+| Gi1/0/1–4 | VLAN 10 |
+| Gi1/0/5–8 | VLAN 20 |
+| Gi1/0/9–12 | VLAN 30 : trois Proxmox, ordre à confirmer ; un port disponible |
+| Gi1/0/13–16 | VLAN 40 |
+| Gi1/0/17–20 | VLAN 50 |
+| Gi1/0/21 | VLAN 99 : administrateur |
+| Gi1/0/22 | VLAN 60 |
+| Gi1/0/23 | Réserve, désactivé ; plus de caméra |
+| Gi1/0/24 | Port routé vers Hillstone LAN, 192.168.0.5/30 |
 
-La DMZ a donc aussi besoin d'un filtre. Pour cette base pédagogique, R2 conserve son ACL : ajouter un second appareil n'est pas indispensable à la démonstration. Pour un suivi réel des connexions entre DMZ et LAN, prévoir ensuite un pare-feu à cette frontière, une fonction équivalente sur R2 si disponible, ou revoir le câblage pour faire passer la DMZ par une interface dédiée du même pare-feu. Un pare-feu unique peut gérer plusieurs zones seulement si les flux concernés le traversent.
+## Routes et trajet web
 
-Les ACL actuelles de R2 autorisent les réponses du proxy vers le LAN uniquement : **la publication Internet n'est pas opérationnelle avec ces seuls fichiers**. Les règles de retour vers Internet, le DNS et les mises à jour du proxy feront partie d'une étape dédiée.
-
-Référence : [Cisco — pare-feu par zones et suivi des connexions](https://www.cisco.com/c/en/us/support/docs/security/ios-firewall/98628-zone-design-guide.html).
-
-## Le trajet d'une page web
-
-1. Le PC du VLAN 10 demande le site au proxy `172.16.3.162` en HTTP/HTTPS : PC → switch → R2 → proxy.
-2. Le proxy ouvre une deuxième connexion vers Web 1 `.69` ou Web 2 `.71` : proxy → R2 → serveur web, via les ports VLAN 30 du switch.
-3. Le serveur web répond via sa passerelle `.65`, puis R2. L'ACL VLAN 30 autorise ces réponses avant les interdictions.
-4. Le proxy renvoie la page au PC : proxy → R2 → switch → PC.
-
-Les utilisateurs ne joignent pas directement les Web. Le proxy choisit le serveur selon sa configuration applicative. Le DNS du site doit pointer vers l'adresse du proxy.
-
-## Ports du switch
-
-| Ports | Affectation |
+| Équipement | Routes nécessaires |
 |---|---|
-| Gi1/0/1–4 | Access VLAN 10 |
-| Gi1/0/5–8 | Access VLAN 20 |
-| Gi1/0/9–12 | Access VLAN 30 : Proxmox 1, 2, 3 et Routeur 2, ordre **à confirmer** |
-| Gi1/0/13–16 | Access VLAN 40 |
-| Gi1/0/17–20 | Access VLAN 50 VoIP |
-| Gi1/0/21 | Access VLAN 99 |
-| Gi1/0/22 | Access VLAN 60 |
-| Gi1/0/23 | Access VLAN 70 caméras |
-| Gi1/0/24 | Lien Routeur 1 conservé |
+| Switch | Défaut vers Hillstone 192.168.0.6 |
+| Hillstone | LAN 172.16.2.0/24 via switch .5 ; défaut vers R1 .1 ; proxy/caméras connectés directement |
+| R1 | LAN, DMZ et transit switch via Hillstone .2 ; défaut vers opérateur |
 
-Routeur 2 **Gi0/0/1** rejoint un port VLAN 30 du switch. **Gi0/0/0** rejoint directement la deuxième carte de Proxmox 2. Tous ces câbles sont non tagués, sans trunk.
+PC → switch → Hillstone → proxy ; puis proxy → Hillstone → switch → Web 1/2. Les réponses reprennent le chemin inverse. Le DNS interne du site doit pointer sur le proxy `.162`.
 
-## Les trois Proxmox
+Toutes les communications proxy/caméras/LAN/Internet passent par le Hillstone. **Les échanges entre VLAN LAN restent sur le switch** : ses ACL sont nécessaires. Les échanges dans un même VLAN échappent aux ACL des passerelles et demandent, si nécessaire, des pare-feu locaux.
 
-Les nœuds `.72`, `.68` et `.73` sont dans le VLAN 30. Web 1 et Web 2 démarrent sur Proxmox 1.
+## Tableau des accès
 
-Proxmox 2 possède deux cartes : carte LAN vers le switch (gestion `.68`, passerelle `.65`) et carte DMZ vers R2. Chaque carte a son propre bridge. Le bridge DMZ n'a aucune IP sur l'hôte ; seule la VM proxy porte `.162`, passerelle `172.16.3.161`. Aucun pont ni routage entre les deux bridges.
+| VLAN / zone | Autorisé | Refusé |
+|---|---|---|
+| 10 | DHCP/DNS `.66`, VLAN 20/40, proxy 80/443, Internet web/NTP | Autres destinations privées et autres sorties |
+| 20 | DHCP/DNS `.66`, VLAN 10/40, proxy 80/443, Internet web/NTP | Autres destinations privées et autres sorties |
+| 30 | Retours DNS/DHCP/admin/Zabbix, Web 1/2 vers proxy en réponse ; Internet web/NTP ; DNS externe depuis `.66` | Autres flux routés privés et autres sorties |
+| 40 | DHCP/DNS `.66`, VLAN 10/20, proxy 80/443, Internet web/NTP | Autres destinations privées et autres sorties |
+| 50 | DHCP/DNS `.66`, IPBX local `.130`, Internet web/NTP | Autres accès privés ; SIP opérateur non configuré |
+| 60 | DHCP/DNS `.66`, proxy 80/443, Internet web/NTP | Autres accès privés et DNS externe direct |
+| 99 | Administration LAN ; proxy SSH/ping/web, caméras SSH/ping/web ; gestion Hillstone HTTPS/SSH | Les politiques Hillstone limitent les services hors LAN |
+| Proxy — Hillstone | Web 1/2 sur 80/443 ; réponses des sessions autorisées | Autres nouvelles connexions |
+| Caméras — Hillstone | DNS `.66`, Zabbix actif `.67` TCP 10051, réponses à l'administration | Proxy, Internet et autres nouvelles connexions LAN |
+| Internet — Hillstone | Réponses des sessions sortantes autorisées | Nouvelles connexions vers les réseaux internes |
 
-La haute disponibilité reste à mettre en place : stockage partagé ou réplication, quorum et bascule. Le proxy ne peut pas migrer automatiquement vers un nœud sans accès à son réseau DMZ.
+Web = TCP 80/443 ; NTP = UDP 123. Les plages privées sont bloquées avant les sorties Internet, sauf exceptions. Le Hillstone suit les sessions ; les ACL Cisco gardent `established` seulement pour les retours traversant les SVI LAN. Ce mot vérifie ACK/RST sans mémoriser la connexion. Les anciennes règles de retour du proxy dans ACL_VLAN30 ont disparu : le proxy arrive désormais sur Gi1/0/24.
 
-## Lire les ACL
+## Configuration et migration
 
-Une ACL se lit de haut en bas : première règle correspondante appliquée. `in` filtre les paquets arrivant par l'interface. Les échanges entre deux machines du VLAN 30 restent locaux et échappent à l'ACL de sa passerelle.
+[Switch L3](../configuration/Switch-L3.txt) · [Hillstone et routes R1](../configuration/Pare-feu-Hillstone.md) · [Recette](Audit_Site_C.md).
 
-| Écriture | Sens |
-|---|---|
-| `host .162` | Une seule adresse (les commandes utilisent l'IP complète) |
-| `any eq 443` | Destination quelconque, port destination 443 |
-| `host .69 eq 443` avant la destination | Web 1, port source 443 : une réponse HTTPS |
-| `established` | TCP avec ACK ou RST ; sert aux retours, sans vérifier l'existence d'une session |
-| `echo-reply` | Réponse à un ping |
-| `deny ip any any log` | Refuser le reste et journaliser |
+Depuis la console, sauvegarder avant changement et prévoir l'interruption de la maquette. Vérifier que le nouveau transit `192.168.0.4/30` est libre.
 
-## Tableau des ACL par VLAN
+1. Retirer le câble R1–switch ; raccorder R1 au WAN Hillstone. Le switch abandonne `192.168.0.2`, que reprend le pare-feu.
+2. Relier Gi1/0/24 au LAN Hillstone ; appliquer `.5/30` sur le switch, `.6/30` sur le pare-feu.
+3. Retirer l'ancien lien pare-feu–VLAN 30. Supprimer sur le switch l'ancienne route `172.16.3.160/27 via 172.16.2.70` et la route par défaut via `192.168.0.1` ; appliquer la nouvelle route par défaut via `.6`.
+4. Déplacer les caméras vers le port CAMERAS. Supprimer l'ancienne SVI 70 (`no interface Vlan70`), son ACL (`no ip access-list extended ACL_VLAN70`) et le VLAN (`no vlan 70`). Désactiver Gi1/0/23 et le remettre dans VLAN 1, comme dans la cible. Aucun doublon de passerelle `.129`.
+5. Remplacer entièrement les ACL modifiées, les réappliquer et saisir les quatre zones/politiques Hillstone. Supprimer ses anciennes adresses LAN `.70` et route par défaut via `.65`, puis appliquer ses nouvelles routes.
+6. Préparer les routes R1 et le NAT Internet avec son responsable. Valider les tests, puis sauvegarder.
 
-Les colonnes décrivent les paquets qui partent du VLAN vers sa passerelle. Une réponse est aussi un paquet : elle doit être autorisée dans le sens retour.
+La configuration WAN opérateur de R1 n'est pas fournie : l'accès Internet reste à finaliser sur ce routeur. Les PDF sont des sources historiques ; les fichiers présents décrivent la nouvelle cible. AD complet, publication publique, DNS/mises à jour du proxy et protocole réel des caméras restent à définir.
 
-| VLAN / zone | Où se trouve l'ACL ? | Autorisé | Bloqué |
-|---|---|---|---|
-| 10 — Service 1 | Switch, `Vlan10 in` : `ACL_VLAN10` | DNS/DHCP vers `.66` ; VLAN 20/40 ; proxy 80/443 ; autres destinations non refusées | VLAN 30 hors DNS/DHCP, VLAN 50/60/99 et DMZ hors proxy web |
-| 20 — Service 2 | Switch, `Vlan20 in` : `ACL_VLAN20` | DNS/DHCP vers `.66` ; VLAN 10/40 ; proxy 80/443 ; autres destinations non refusées | VLAN 30 hors DNS/DHCP, VLAN 50/60/99 et DMZ hors proxy web |
-| 30 — Serveurs | Switch, `Vlan30 in` : `ACL_VLAN30` | Retours DNS/DHCP, administration, Zabbix et proxy ; Web 1/2 répondent au proxy ; sorties externes 80/443 et NTP 123 ; DNS externe depuis `.66` | Autres flux vers les réseaux privés ; autres sorties routées |
-| 40 — Wi-Fi employés | Switch, `Vlan40 in` : `ACL_WIFI_EMPLOYES` | DNS/DHCP vers `.66` ; VLAN 10/20 ; proxy 80/443 ; autres destinations non refusées | VLAN 30 hors DNS/DHCP, VLAN 50/60/99 et DMZ hors proxy web |
-| 50 — VoIP | Switch, `Vlan50 in` : `ACL_VLAN50` | DHCP, DNS UDP vers `.66` ; IPBX local `.130` ; autres destinations non refusées | Autres accès LAN/DMZ |
-| 60 — Invités | Switch, `Vlan60 in` : `ACL_WIFI_INVITES` | DHCP ; DNS TCP/UDP ; proxy 80/443 ; autres destinations non refusées | Autres accès LAN/DMZ (les exceptions DNS sont prioritaires) |
-| 70 — Caméras | Switch, `Vlan70 in` : `ACL_VLAN70` | DNS UDP vers `.66` ; Zabbix TCP 10051 vers `.67` ; réponses TCP/ping aux administrateurs | Tout le reste |
-| 99 — Administration | Switch, `Vlan99 in` : `ACL_VLAN99` | Tout trafic IP provenant du VLAN 99, sous réserve des filtres du trajet et des retours | Sources extérieures au VLAN 99 sur cette interface |
-| DMZ proxy — zone 71 | R2, `Gi0/0/0 in` : `DMZ_VERS_LAN` | Proxy `.162` vers Web `.69`/`.71` sur 80/443 ; réponses web aux clients ; réponses SSH/ping aux administrateurs | Tout le reste, dont DNS et mises à jour du proxy pour cette base |
-| SSH des équipements | Switch et R2, lignes VTY : `SSH_VLAN99` | Connexions SSH depuis le VLAN 99 | SSH depuis les autres réseaux |
+## Évolutions prévues
 
-Pour les VLAN 10/20/40/50/60, la dernière permission reste générale après les refus listés : elle ne garantit pas le blocage de tous les réseaux privés possibles. Les échanges locaux du VLAN 30 et les téléphones vers leur IPBX local ne passent pas par les ACL des passerelles.
+- **Deuxième switch LAN + EtherChannel LACP** : sélectionner deux ports compatibles et un trunk limité aux VLAN utiles. Gi1/0/23 est réservé, un port VLAN 30 peut être réaffecté si libre. Aucun Port-channel n'est configuré aujourd'hui. LACP tolère une panne de lien, pas celle du switch qui porte les passerelles.
+- **HA Proxmox** : stockage partagé/réplication, quorum et bascule à valider. Le proxy reste unique sur Proxmox 2 ; sa panne rend les sites inaccessibles via le proxy.
 
-Exemple de retour : le proxy contacte Web 1 sur le port **destination** 443. Web 1 répond depuis son port **source** 443 vers le port temporaire choisi par le proxy. C'est pourquoi le retour utilise `host 172.16.2.69 eq 443 host 172.16.3.162 established`. Le mot `established` vérifie ACK/RST ; il ne mémorise aucune connexion.
-
-R2 garde **une seule ACL de trafic**, en entrée DMZ, et une ACL distincte pour protéger son SSH. La seconde ACL de trafic côté LAN a été retirée : les VLAN clients sont déjà filtrés sur le switch. Le VLAN 99 peut envoyer librement vers la DMZ, mais seuls les retours prévus passent le filtre DMZ.
-
-Pour cette base, AD hors DNS/DHCP, supervision par interrogation, DNS et mises à jour du proxy restent à définir. Les sorties autorisées par port ne sont pas limitées à des sites précis. R1 garde la responsabilité des accès Internet ; son NAT et ses filtres ne sont pas configurés ici.
-
-## Remplacer une ancienne configuration
-
-Ces fichiers décrivent la configuration cible. Sur la maquette, sauvegarder avant modification, utiliser la console et remplacer `A_REMPLACER`.
-
-- Remplacer entièrement les ACL modifiées ; coller des règles après un ancien `permit` ou `deny` final ne suffit pas. Détacher l'ACL, supprimer sa définition, recréer la version cible puis la réappliquer, pendant une interruption de la maquette.
-- Sur R2, retirer l'ancien filtre LAN avec `interface GigabitEthernet0/0/1`, `no ip access-group LAN_VERS_DMZ in`, `exit`, puis `no ip access-list extended LAN_VERS_DMZ` en mode configuration. Conserver le filtre DMZ.
-- Si une ancienne SVI 71 existe sur le switch, la retirer : seule R2 porte la passerelle du proxy. Le VLAN 80 n'est pas utilisé ; `.192/27` reste en réserve.
-- Le lien R1 reste `192.168.0.2/30` vers `.1`. R1 doit connaître les routes de retour LAN/DMZ via `.2` ; à coordonner avec son responsable.
-
-[Plan d'adressage](../README.md) · [Vérifications sur la maquette](Audit_Site_C.md)
+[Plan d'adressage](../README.md)
