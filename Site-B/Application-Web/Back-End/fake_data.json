@@ -1,0 +1,57 @@
+{
+  "site": {
+    "name": "Site-B",
+    "environment": "DMZ / Application-Web",
+    "description": "Portail applicatif et services d'infrastructure DMZ"
+  },
+  "services": [
+    {
+      "id": "srv-reverse-proxy",
+      "name": "Nginx / HAProxy Reverse Proxy",
+      "ip": "10.0.20.3",
+      "zone": "DMZ",
+      "status": "Actif",
+      "description": "Gestion centralisée des flux entrants et répartition de charge vers les serveurs applicatifs."
+    },
+    {
+      "id": "srv-web-backend",
+      "name": "Serveur Web & API Python",
+      "ip": "10.0.20.4",
+      "zone": "DMZ",
+      "status": "Actif",
+      "description": "Serveur applicatif Python traitant la logique métier et les points de terminaison REST."
+    },
+    {
+      "id": "srv-dns-ad",
+      "name": "Contrôleur de Domaine & DNS",
+      "ip": "192.168.50.11",
+      "zone": "LAN (VLAN 50)",
+      "status": "Actif",
+      "description": "Annuaire Active Directory, serveur DNS d'entreprise et relais DHCP."
+    },
+    {
+      "id": "srv-debian-base",
+      "name": "Base de Données Debian",
+      "ip": "192.168.50.12",
+      "zone": "LAN (VLAN 50)",
+      "status": "Actif",
+      "description": "Serveur de bases de données relationnelles interne."
+    },
+    {
+      "id": "srv-zabbix",
+      "name": "Supervision Zabbix",
+      "ip": "192.168.50.13",
+      "zone": "LAN (VLAN 50)",
+      "status": "Surveillance",
+      "description": "Collecte d'indicateurs de santé, métriques et télémétrie des services réseau."
+    },
+    {
+      "id": "srv-squid",
+      "name": "Proxy Cache Squid",
+      "ip": "192.168.50.14",
+      "zone": "LAN (VLAN 50)",
+      "status": "Actif",
+      "description": "Filtrage et proxy de sortie pour les postes clients des VLANs."
+    }
+  ]
+}

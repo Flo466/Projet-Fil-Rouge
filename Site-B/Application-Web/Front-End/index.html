@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Portail d'accueil - Site B - Projet Fil Rouge">
+  <title>Accueil - Site B | Projet Fil Rouge</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-container">
+      <div class="logo-group">
+        <span class="logo-icon">🏢</span>
+        <div class="logo-text">
+          <h1>Site B</h1>
+          <span class="sub-title">Projet Fil Rouge &bull; TP-AIS</span>
+        </div>
+      </div>
+      <nav class="nav-menu" aria-label="Navigation principale">
+        <a href="#services" class="nav-link">Services</a>
+        <a href="#status" class="nav-link">État Système</a>
+        <a href="#about" class="nav-link">Architecture</a>
+        <button id="theme-toggle" class="btn-icon" aria-label="Basculer le thème">
+          <span id="theme-icon" class="theme-icon">🌓</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="hero-section">
+      <div class="container hero-container">
+        <span class="badge">Environnement Site B</span>
+        <h2 class="hero-title">Plateforme &amp; Services Web</h2>
+        <p class="hero-description">
+          Bienvenue sur le portail applicatif du Site B. Cet environnement héberge les services
+          d'infrastructure, la passerelle applicative et les interfaces de supervision.
+        </p>
+        <div class="hero-actions">
+          <a href="#services" class="btn btn-primary">Consulter les services</a>
+          <a href="#status" class="btn btn-outline">Vérifier l'API Back-End</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Services Hébergés</h2>
+          <p class="section-subtitle">Aperçu des composants d'infrastructure et d'application du Site B.</p>
+        </div>
+        <div id="services-grid" class="grid grid-3">
+          <article class="card">
+            <div class="card-icon">🛡️</div>
+            <h3 class="card-title">Reverse Proxy</h3>
+            <p class="card-text">Gestion centralisée des flux entrants et répartition de charge vers les serveurs applicatifs.</p>
+            <div class="card-footer">
+              <span class="status-indicator online"></span>
+              <span class="status-text">Actif (DMZ 10.0.20.3)</span>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">⚙️</div>
+            <h3 class="card-title">API Back-End</h3>
+            <p class="card-text">Serveur applicatif Python traitant la logique métier et fournissant les points de terminaison REST.</p>
+            <div class="card-footer">
+              <span id="backend-indicator" class="status-indicator checking"></span>
+              <span id="backend-status-text" class="status-text">Connexion en cours...</span>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">📊</div>
+            <h3 class="card-title">Supervision &amp; Métriques</h3>
+            <p class="card-text">Collecte d'indicateurs de santé et télémétrie des services réseau et applicatifs.</p>
+            <div class="card-footer">
+              <span class="status-indicator online"></span>
+              <span class="status-text">Surveillé (Zabbix)</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="status" class="section section-alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Statut en direct du Back-End</h2>
+          <p class="section-subtitle">Télémétrie en temps réel interrogée via l'API REST Python.</p>
+        </div>
+        <div class="status-box">
+          <div class="status-box-header">
+            <div class="status-box-title">
+              <span id="pulse-indicator" class="pulse-dot"></span>
+              <span>Point de terminaison : <code>/api/status</code></span>
+            </div>
+            <button id="refresh-status-btn" class="btn btn-sm btn-outline">
+              <span>Actualiser</span>
+            </button>
+          </div>
+          <div class="status-box-body">
+            <div class="telemetry-grid">
+              <div class="telemetry-item">
+                <span class="telemetry-label">Statut Serveur</span>
+                <span id="telemetry-status" class="telemetry-value">--</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="telemetry-label">Moteur Python</span>
+                <span id="telemetry-version" class="telemetry-value">--</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="telemetry-label">Système d'exploitation</span>
+                <span id="telemetry-os" class="telemetry-value">--</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="telemetry-label">Temps de fonctionnement</span>
+                <span id="telemetry-uptime" class="telemetry-value">--</span>
+              </div>
+            </div>
+            <div id="connection-alert" class="alert hidden">
+              <strong>Information :</strong> Le serveur Python n'est pas encore joignable. Lancez <code>python3 server.py</code> dans le répertoire <code>Back-End</code> pour alimenter ce panneau.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Architecture Modulaire</h2>
+          <p class="section-subtitle">Séparation stricte des responsabilités.</p>
+        </div>
+        <div class="architecture-grid">
+          <div class="arch-card">
+            <h4>Front-End</h4>
+            <p>Code HTML5 sémantique sans style intégré, design centralisé dans <code>style.css</code> et connecteur dynamique via <code>app.js</code>.</p>
+          </div>
+          <div class="arch-card">
+            <h4>Back-End</h4>
+            <p>Serveur écrit exclusivement en Python, assurant le traitement HTTP, les endpoints JSON et les en-têtes CORS sans dépendance superflue.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <p>&copy; 2026 Site B &bull; Projet Fil Rouge &bull; TP Administrateur d'Infrastructures Sécurisées</p>
+      <div class="footer-links">
+        <a href="../../README.md">Documentation globale</a>
+        <a href="../Back-End/README.md">Documentation Back-End</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
+
