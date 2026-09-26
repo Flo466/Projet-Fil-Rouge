@@ -1,20 +1,22 @@
-# Vérifications de la maquette
+# Recette de la maquette
 
-Cette liste décrit les résultats attendus. Aucun équipement réel n'a été testé à distance.
+Résultats attendus, à vérifier sur le matériel ; aucun équipement n'a été configuré à distance.
 
-| À vérifier | Résultat attendu |
+| Contrôle | Attendu |
 |---|---|
-| `show vlan brief` et `show ip interface brief` | VLAN, ports et passerelles conformes au plan ; pas de SVI 71 ni VLAN 80 |
-| Routes | Switch : DMZ proxy via `.70` ; R2 : défaut via `.65` |
-| PC VLAN 10 → proxy HTTP/HTTPS | Page reçue, avec Web 1 puis Web 2 comme cible |
-| PC VLAN 10 → Web 1/2 directement | Refus |
-| Proxy → Web 1/2 sur 80/443 | Connexion et réponses autorisées |
-| Proxy → autre serveur LAN sur SSH | Refus par R2 |
-| DHCP et DNS des clients | Bail, passerelle et résolution fonctionnels |
-| VLAN 99 → SSH R2 et interface Proxmox | Connexion et réponses ; SSH R2 refusé depuis les autres VLAN |
-| Serveur → nouvelle connexion vers client/caméra/admin | Refus hors exceptions documentées |
-| Serveur → Internet | HTTP/HTTPS/NTP autorisés ; DNS externe réservé à `.66`, sous réserve de R1 |
-| Caméras | DNS et flux Zabbix actif si matériel compatible ; autres flux refusés |
-| Proxmox 2 | Deux bridges séparés ; VM proxy uniquement dans la DMZ |
+| Switch : VLAN et interfaces | VLAN 10/20/30/40/50/60/99 ; aucune SVI 70/71 ; Gi1/0/23 désactivé, Gi1/0/24 .5/30 |
+| Adresses de transit | R1 .1 ↔ Hillstone WAN .2 ; Hillstone LAN .6 ↔ switch .5 ; pas de doublon |
+| Routes | Switch défaut .6 ; Hillstone LAN via .5, défaut .1 ; R1 retours via .2 |
+| Client → proxy puis chacun des Web | HTTP/HTTPS aller-retour autorisé ; session Hillstone visible |
+| Client → Web directement | Refus par ACL du VLAN client |
+| Proxy → autre serveur LAN en SSH | Refus Hillstone |
+| Caméra → DNS / Zabbix actif | Autorisé si services présents et caméra compatible |
+| Caméra → proxy ou Internet | Refus Hillstone |
+| ADMIN → proxy/caméra | SSH, web et ping selon services installés |
+| ADMIN → Hillstone .6 | HTTPS/SSH fonctionne ; gestion refusée depuis les autres réseaux |
+| DHCP et DNS LAN | Baux et résolution corrects |
+| LAN → Internet | Web/NTP autorisés, DNS externe depuis `.66` ; dépend aussi du NAT/accès opérateur R1 |
+| Internet → nouvelle connexion LAN/DMZ | Refus Hillstone, aucune publication active |
+| Proxmox 2 | Deux bridges séparés, seule la VM proxy est côté DMZ |
 
-Confirmer les ports 9–12, les cartes Proxmox et les IP libres. La HA, AD complet et le protocole réel de supervision restent à valider séparément. Conserver les compteurs `show access-lists` et les résultats obtenus, puis sauvegarder les équipements.
+Conserver compteurs ACL, journaux et sessions du pare-feu ainsi que les résultats positifs/négatifs. Valider le bloc transit `.4/30`, les ports physiques, les IP libres et le fonctionnement avant sauvegarde. Deuxième switch/LACP et HA restent des étapes futures.
